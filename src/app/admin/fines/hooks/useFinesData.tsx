@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Fine, FineSummary, PaymentFines } from "../types";
+import { Fine, FineSummary, PaymentFines, PaymentFinesData } from "../types";
 import { getFines, getFinesSummary } from "@/lib/admin/fines";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 import { Dormer } from "../../dormers/types";
@@ -29,7 +29,13 @@ export const useFinesData = () =>{
                 const finesData = snapshot.docs.map(
                     (doc) => ({ id: doc.id, ...doc.data() } as PaymentFines)
                 );
-                setFines(finesData);
+                // Sort fines by createdAt in descending order (most recent first)
+                const sortedFines = finesData.sort((a, b) => {
+                    const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as any)?.toDate?.() || new Date();
+                    const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as any)?.toDate?.() || new Date();
+                    return dateB.getTime() - dateA.getTime();
+                });
+                setFines(sortedFines);
                 setLoading(false);
             }
         );
@@ -57,7 +63,7 @@ export const useFinesData = () =>{
                 const dormerData = snapshot.docs
                   .map((doc) => ({ id: doc.id, ...doc.data() } as Dormer))
                   .filter(
-                    (dormer) => dormer.role === "User" && dormer.isDeleted !== true
+                    (dormer) => dormer.isDeleted !== true
                   );
                 setDormers(dormerData);
                 setLoading(false);
@@ -75,9 +81,16 @@ export const useFinesData = () =>{
 
     const dormersWithFines = useMemo(() => {
         if(!dormers.length) return [];
+        const dormersMap = new Map(dormers.map(d => [d.id, d]));
         return dormers.map((dormer) => ({
             ...dormer,
             fines: fines.filter((fine) => fine.dormerId === dormer.id)
+            .map(fine => ({
+                ...fine,
+                recordedBy: typeof fine.recordedBy === "string"
+                    ? dormersMap.get(fine.recordedBy) || { firstName: "Unknown", lastName: "User", email: "" }
+                    : fine.recordedBy
+            }))
         }))
     }, [dormers, fines]);
 
@@ -117,5 +130,5 @@ export const useFinesData = () =>{
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, statusFilter]);
-    return { fines, payableFines, loading, error, summary, paginatedDormers, totalPages, currentPage, searchTerm, setSearchTerm, statusFilter, setStatusFilter, handleNextPage, handlePreviousPage };
+    return { fines, payableFines, loading, error, summary, paginatedDormers, totalPages, currentPage, searchTerm, setSearchTerm, statusFilter, setStatusFilter, handleNextPage, handlePreviousPage, dormers };
 }

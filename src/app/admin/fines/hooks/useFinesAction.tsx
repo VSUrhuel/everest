@@ -3,7 +3,7 @@ import { BillFines, Fine, PaymentFines } from "../types";
 import { addFine as addFineLib, updateFine as updateFineLib, deleteFine as deleteFineLib } from "@/lib/admin/fines";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 import { toast } from "sonner";
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import { firestore as db } from "@/lib/firebase";
 import { User } from "firebase/auth";
 
@@ -20,7 +20,7 @@ export const useFinesActions = () => {
         }
         try {
             setIsSubmitting(true);
-            await addFineLib(fine, dormitoryId);
+            await addFineLib(fine, "", dormitoryId);
             setIsSubmitting(false);
             toast.success("Fine added successfully");
         } catch (error) {
@@ -63,7 +63,7 @@ export const useFinesActions = () => {
                 amountPaid: 0,
                 createdAt: serverTimestamp(),
                 paymentDate: null,
-                createdBy: user?.uid
+                dateImposed: fineData.dateImposed || serverTimestamp(),
             });
             toast.success("Fine generated successfully");
             setIsSubmitting(false);
@@ -88,6 +88,7 @@ export const useFinesActions = () => {
                 remainingBalance: paymentData.remainingBalance,
                 notes: paymentData.notes,
                 status: paymentData.remainingBalance <= 0 ? "Paid" : paymentData.remainingBalance > 0 ? "Partially Paid" : "Unpaid",
+                recordedBy: user?.uid || "",
                 updatedAt: serverTimestamp(),
                 updatedBy: user?.uid
             });
@@ -106,5 +107,47 @@ export const useFinesActions = () => {
         }
     };
     
-    return { addFine, updateFine, deleteFine, saveFine, handleSavePayment, isSubmitting, error };
+    const payAllFines = async (fines: PaymentFines[], user: User | null) => {
+        try {
+            setIsSubmitting(true);
+            const batch = writeBatch(db);
+            for (const fine of fines) {
+                if (fine.status !== "Paid") {
+                    const fineRef = doc(db, "finesPayment", fine.id);
+                    batch.update(fineRef, {
+                        amountPaid: fine.amountPaid + fine.remainingBalance,
+                        paymentDate: serverTimestamp(),
+                        remainingBalance: 0,
+                        status: "Paid",
+                        updatedAt: serverTimestamp(),
+                        updatedBy: user?.uid,
+                        recordedBy: user?.uid || "",
+                    });
+                   
+                    const historyRef = collection(db, "finesPaymentHistory");
+                    batch.set(doc(historyRef), {
+                        ...fine,
+                        amountPaid: fine.amountPaid + fine.remainingBalance,
+                        paymentDate: serverTimestamp(),
+                        remainingBalance: 0,
+                        notes: "Bulk payment - Pay All",
+                        createdAt: serverTimestamp(),
+                        createdBy: user?.uid,
+                        recordedBy: user?.uid || "",
+                        updatedAt: serverTimestamp(),
+                    });
+                }
+            }
+            await batch.commit();
+            toast.success("All fines paid successfully");
+            setIsSubmitting(false);
+        } catch (error) {
+            setError(error as Error);
+            console.error("Pay all fines error:", error);
+            setIsSubmitting(false);
+            toast.error("Failed to pay all fines");
+        }
+    };
+    
+    return { addFine, updateFine, deleteFine, saveFine, handleSavePayment, payAllFines, isSubmitting, error };
 }

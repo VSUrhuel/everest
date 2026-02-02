@@ -23,7 +23,14 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
+import { Timestamp } from "firebase/firestore";
 import { Dormer } from "../../dormers/types";
 import { BillFines, Fine, PaymentFines } from "../types";
 // --- Type Definitions ---
@@ -34,7 +41,7 @@ interface GenerateFinesModalProps {
   dormer: Dormer | null;
   onGenerateFine: (fineData: BillFines) => void;
   payables: Fine[];
-  paymentFines: PaymentFines[]; 
+  paymentFines: PaymentFines[];
   setShowErrorModal: (show: boolean) => void;
   setFineToCreate: (fine: any) => void;
 }
@@ -57,16 +64,16 @@ export default function GenerateFinesModal({
   const [totalAmount, setTotalAmount] = useState(0);
   const [description, setDescription] = useState("");
   const [finesRemarks, setFinesRemarks] = useState("");
+  const [dateImposed, setDateImposed] = useState("");
 
   useEffect(() => {
     const newTotal = payables.reduce((sum, payable) => {
       return selectedPayables[payable.id] ? sum + payable.amount : sum;
     }, 0);
-    setFinesRemarks(
-      payables.reduce((description, payable) => {
-        return selectedPayables[payable.id] ? description + payable.name + " - " : description;
-      }, "").slice(0, -2)
-    )
+    const selectedNames = payables
+      .filter((payable) => selectedPayables[payable.id])
+      .map((payable) => payable.name);
+    setFinesRemarks(selectedNames.join(", "));
     setTotalAmount(newTotal);
   }, [selectedPayables, payables]);
 
@@ -75,6 +82,8 @@ export default function GenerateFinesModal({
       setSelectedPayables({});
       setTotalAmount(0);
       setDescription("");
+      const today = new Date().toISOString().split("T")[0];
+      setDateImposed(today);
     }
   }, [isOpen, dormer]);
 
@@ -87,7 +96,6 @@ export default function GenerateFinesModal({
 
   if (!dormer) return null;
 
-
   const handleGenerateFine = () => {
     if (totalAmount <= 0) {
       toast.info("Please select at least one payable to generate a fine.");
@@ -99,10 +107,11 @@ export default function GenerateFinesModal({
     }
 
     const paymentFineData = {
-      dormerId: dormer.id, 
+      dormerId: dormer.id,
       dormitoryId: dormer.dormitoryId,
       finesRemarks: finesRemarks,
       description: description,
+      dateImposed: Timestamp.fromDate(new Date(dateImposed)),
       totalAmountDue: totalAmount,
     };
 
@@ -149,32 +158,50 @@ export default function GenerateFinesModal({
                 </p>
               </div>
             </div>
-            <div className="space-y-2 p-4 border rounded-lg bg-slate-50">
-              {payables.map((payable) => (
-                <div
-                  key={payable.id}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      id={payable.id}
-                      checked={!!selectedPayables[payable.id]}
-                      onCheckedChange={() => handlePayableChange(payable.id)}
-                      className={undefined}
-                    />
-                    <Label
-                      htmlFor={payable.id}
-                      className="font-normal text-sm cursor-pointer"
-                    >
-                      {payable.name}
-                    </Label>
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">
-                    ₱{payable.amount.toFixed(2)}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between text-left font-normal" size={undefined}                >
+                  <span className="truncate">
+                    {Object.keys(selectedPayables).filter(id => selectedPayables[id]).length === 0
+                      ? "Select payables..."
+                      : `${Object.keys(selectedPayables).filter(id => selectedPayables[id]).length} selected`
+                    }
                   </span>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-full p-0" align="start">
+                <div className="max-h-60 overflow-y-auto p-2 space-y-2">
+                  {payables.map((payable) => (
+                    <div
+                      key={payable.id}
+                      className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+                      onClick={() => handlePayableChange(payable.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id={payable.id}
+                          checked={!!selectedPayables[payable.id]}
+                          onChange={() => {}} 
+                          className="pointer-events-none"
+                        />
+                        <Label
+                          htmlFor={payable.id}
+                          className="font-normal text-sm cursor-pointer flex-1"
+                        >
+                          {payable.name}
+                        </Label>
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">
+                        ₱{payable.amount.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div>
@@ -189,10 +216,25 @@ export default function GenerateFinesModal({
               className="mt-1 bg-gray-100 font-semibold text-gray-800"
             />
           </div>
+          <div>
+            <Label htmlFor="dateImposed" className={undefined}>
+              Date Imposed
+            </Label>
+            <Input
+              id="dateImposed"
+              type="date"
+              value={dateImposed}
+              onChange={(e) => setDateImposed(e.target.value)}
+              className="mt-1"
+            />
+          </div>
 
           <div>
             <Label htmlFor="description" className={undefined}>
-              Description / Notes <span className="text-xs text-gray-500">({description.length}/500)</span>
+              Description / Notes{" "}
+              <span className="text-xs text-gray-500">
+                ({description.length}/500)
+              </span>
             </Label>
             <Textarea
               id="description"

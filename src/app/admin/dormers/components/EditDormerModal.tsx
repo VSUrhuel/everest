@@ -194,16 +194,16 @@ export default function EditDormerModal({
               </SelectTrigger>
               <SelectContent className={undefined}>
                 {dormitoryName === "Mabolo Mens Home" ? (
-                  MaboloRoomNumber.map((room) => {
+                  MaboloRoomNumber.map((room) => (
                     <SelectItem key={room} className={undefined} value={room}>
                       {room}
                     </SelectItem>
-                  })
-                ): (SampaguitaRoomNumber.map((room) => {
+                  ))
+                ): (SampaguitaRoomNumber.map((room) => (
                   <SelectItem key={room} className={undefined} value={room}>
                     {room}
                   </SelectItem>
-                }))}
+                )))}
               </SelectContent>
             </Select>
           </div>

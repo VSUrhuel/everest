@@ -29,7 +29,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Dormer } from "../../dormers/types";
-import { PaymentFines } from "../types";
+import { PaymentFines, PaymentFinesData } from "../types";
 import { serverTimestamp } from "firebase/firestore";
 
 // --- Type Definitions ---
@@ -37,7 +37,7 @@ interface FinePaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   dormer: Dormer | null;
-  fine: PaymentFines | null;
+  fine: PaymentFinesData | null;
   onSavePayment: (paymentData: any) => Promise<void>;
 }
 
