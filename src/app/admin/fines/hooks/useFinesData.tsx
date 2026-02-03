@@ -57,6 +57,7 @@ export const useFinesData = () =>{
             setLoading(false);
         }
 
+        // Fetch all dormers (including admins) for mapping recordedBy and imposedBy
         const unsubscribeDormers = onSnapshot(
               query(collection(db, "dormers"), where("dormitoryId", "==", dormitoryId)),
               (snapshot) => {
@@ -65,6 +66,12 @@ export const useFinesData = () =>{
                   .filter(
                     (dormer) => dormer.isDeleted !== true
                   );
+                // console.log('All dormers fetched (including admins):', dormerData.map(d => ({ 
+                //     id: d.id, 
+                //     name: `${d.firstName} ${d.lastName}`, 
+                //     role: d.role, 
+                //     email: d.email 
+                // })));
                 setDormers(dormerData);
                 setLoading(false);
               }
@@ -81,15 +88,46 @@ export const useFinesData = () =>{
 
     const dormersWithFines = useMemo(() => {
         if(!dormers.length) return [];
+        // Create maps for both UID and email lookup (for legacy data)
         const dormersMap = new Map(dormers.map(d => [d.id, d]));
+        const dormersByEmail = new Map(dormers.map(d => [d.email?.toLowerCase(), d]));
+        
+        // console.log('Dormers map keys (UIDs):', Array.from(dormersMap.keys()));
+        // console.log('Dormers by email keys:', Array.from(dormersByEmail.keys()));
+        
+        // Helper function to resolve user by UID or email
+        const resolveUser = (identifier: string | undefined): Dormer => {
+            if (!identifier) return { firstName: "Unknown", lastName: "User", email: "" } as Dormer;
+            
+            // Try to find by UID first
+            let user = dormersMap.get(identifier);
+            console.log(`Resolving "${identifier}" by UID: ${user ? `Found ${user.firstName} ${user.lastName}` : 'NOT FOUND'}`);
+            
+            // If not found and it looks like an email, try email lookup (case-insensitive)
+            if (!user && identifier.includes('@')) {
+                const normalizedEmail = identifier.toLowerCase();
+                user = dormersByEmail.get(normalizedEmail);
+                //console.log(`  Trying email "${normalizedEmail}": ${user ? `Found ${user.firstName} ${user.lastName}` : 'NOT FOUND'}`);
+            }
+            
+            if (!user) {
+                console.warn(`Could not resolve user for identifier: "${identifier}"`);
+            }
+            
+            return user || { firstName: "Unknown", lastName: "User", email: "" } as Dormer;
+        };
+        
         return dormers.map((dormer) => ({
             ...dormer,
             fines: fines.filter((fine) => fine.dormerId === dormer.id)
             .map(fine => ({
                 ...fine,
                 recordedBy: typeof fine.recordedBy === "string"
-                    ? dormersMap.get(fine.recordedBy) || { firstName: "Unknown", lastName: "User", email: "" }
-                    : fine.recordedBy
+                    ? resolveUser(fine.recordedBy)
+                    : fine.recordedBy,
+                imposedBy: typeof fine.imposedBy === "string"
+                    ? resolveUser(fine.imposedBy)
+                    : fine.imposedBy
             }))
         }))
     }, [dormers, fines]);
@@ -130,5 +168,5 @@ export const useFinesData = () =>{
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, statusFilter]);
-    return { fines, payableFines, loading, error, summary, paginatedDormers, totalPages, currentPage, searchTerm, setSearchTerm, statusFilter, setStatusFilter, handleNextPage, handlePreviousPage, dormers };
+    return { fines, payableFines, loading, error, summary, paginatedDormers, totalPages, currentPage, searchTerm, setSearchTerm, statusFilter, setStatusFilter, handleNextPage, handlePreviousPage, dormers, dormersWithFines };
 }

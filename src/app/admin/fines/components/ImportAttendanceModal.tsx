@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Fine } from "../types"; 
-import { FileUp, Info, ExternalLink } from "lucide-react";
+import { FileUp, Info, ExternalLink, AlertCircle } from "lucide-react";
 
 interface ImportAttendanceModalProps {
   isOpen: boolean;
@@ -32,11 +32,30 @@ export default function ImportAttendanceModal({
   payableFines,
 }: ImportAttendanceModalProps) {
   const [csvText, setCsvText] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFine, setSelectedFine] = useState<Fine | null>(null);
+  const [rowCount, setRowCount] = useState(0);
+  const [fineCount, setFineCount] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setCsvText(e.target.value);
+    const text = e.target.value;
+    setCsvText(text);
+    const lines = text.trim().split("\n").filter(line => line.trim());
+    // Subtract header row if exists
+    const dataRows = lines.length > 0 && lines[0].toLowerCase().includes('email') ? lines.length - 1 : lines.length;
+    setRowCount(dataRows);
+    
+    // Rough estimate: count empty cells (absences) for fine count preview
+    let estimatedFines = 0;
+    lines.forEach((line, idx) => {
+      if (idx === 0 && line.toLowerCase().includes('email')) return; // Skip header
+      const cells = line.split(',');
+      if (cells.length > 3) {
+        // Count empty date cells (starting from index 3)
+        estimatedFines += cells.slice(3).filter(cell => !cell.trim() || cell.trim() === '').length;
+      }
+    });
+    setFineCount(estimatedFines);
   };
 
   const parseAttendanceCSV = (text: string, selectedFine: Fine | null) => {
@@ -105,11 +124,11 @@ export default function ImportAttendanceModal({
         continue;
       }
 
-      let hasAbsences = false;
+      // Process attendance dates - skip rows with perfect attendance (no absences)
       for (let j = 3; j < parts.length && j < headers.length; j++) {
         const value = parts[j]?.trim();
-        if (value === "1") {
-          hasAbsences = true;
+        // Empty cell indicates absence (fineable date)
+        if (value === "" || value === undefined) {
           const dateStr = headers[j];
           const date = new Date(dateStr);
 
@@ -130,14 +149,7 @@ export default function ImportAttendanceModal({
           });
         }
       }
-
-      if (!hasAbsences) {
-        errors.push(`Row ${rowNumber}: No absences marked for ${firstName} ${lastName} (${email}). At least one attendance column must be "1".`);
-      }
-    }
-
-    if (fines.length === 0 && errors.length === 0) {
-      errors.push("No valid attendance data found. Ensure at least one student has absences marked with '1'.");
+      // Note: Rows with perfect attendance (no empty cells) are silently skipped - they don't generate fines
     }
 
     return { fines, errors };
@@ -171,6 +183,20 @@ export default function ImportAttendanceModal({
     reader.onload = (event) => {
       const text = event.target?.result as string;
       setCsvText(text);
+      const lines = text.trim().split("\n").filter(line => line.trim());
+      const dataRows = lines.length > 0 && lines[0].toLowerCase().includes('email') ? lines.length - 1 : lines.length;
+      setRowCount(dataRows);
+      
+      // Estimate fine count
+      let estimatedFines = 0;
+      lines.forEach((line, idx) => {
+        if (idx === 0 && line.toLowerCase().includes('email')) return;
+        const cells = line.split(',');
+        if (cells.length > 3) {
+          estimatedFines += cells.slice(3).filter(cell => !cell.trim() || cell.trim() === '').length;
+        }
+      });
+      setFineCount(estimatedFines);
     };
     reader.readAsText(file);
   };
@@ -178,6 +204,8 @@ export default function ImportAttendanceModal({
   const handleClose = () => {
     setCsvText("");
     setSelectedFine(null);
+    setRowCount(0);
+    setFineCount(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
     onClose();
   };
@@ -191,7 +219,7 @@ export default function ImportAttendanceModal({
           </DialogTitle>
           <DialogDescription className={undefined}>
             Upload or paste CSV data for fines. Fines will be generated for
-            empty cells using dormer emails as unique identifiers, with names as additional reference.
+            empty cells (absences) using dormer emails as unique identifiers, with names as additional reference.
           </DialogDescription>
         </DialogHeader>
 
@@ -204,7 +232,7 @@ export default function ImportAttendanceModal({
                 Email, First Name, Last Name, 1/1/2026, 1/2/2026, ...
               </code>
               <p className="mt-2 text-xs italic">
-                * Use 1 for present, leave empty for absent. Each row is a dormer's record with email as unique identifier.
+                * Leave cells <strong>empty</strong> for absences (fineable dates). Mark with "1" for present (non-fineable). Each row is a dormer's record with email as unique identifier.
               </p>
               <p className="mt-2 text-xs font-medium">
                 Please make sure you are following this format. 
@@ -218,8 +246,23 @@ export default function ImportAttendanceModal({
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </p>
+              <p className="mt-2 text-xs font-semibold text-blue-900">
+                💡 Best Practice:  Import in batches of 50 rows or less to minimize errors and ensure faster processing.
+              </p>
             </div>
           </div>
+
+          {rowCount > 50 && (
+            <div className="bg-yellow-50 p-4 rounded-md flex gap-3 border border-yellow-200">
+              <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-semibold mb-1">Large Import Detected ({rowCount} students, ~{fineCount} fines)</p>
+                <p className="text-xs">
+                  Processing {rowCount} students with approximately {fineCount} fines. This might take a while. Consider splitting into smaller batches (50 students each) for better reliability and easier error tracking.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="text-sm font-medium">Select Fine Type</label>
@@ -289,7 +332,13 @@ export default function ImportAttendanceModal({
             variant={undefined}
             size={undefined}
           >
-            {isSubmitting ? "Generating Fines..." : "Generate Fines"}
+            {isSubmitting 
+              ? rowCount > 50 || fineCount > 100
+                ? `Generating ~${fineCount} fines... This might take a while...`
+                : "Generating fines..."
+              : fineCount > 0 
+                ? `Generate ~${fineCount} Fines` 
+                : "Generate Fines"}
           </Button>
         </DialogFooter>
       </DialogContent>

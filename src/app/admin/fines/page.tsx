@@ -29,6 +29,7 @@ export default function FinesPage() {
     handleNextPage,
     handlePreviousPage,
     dormers,
+    dormersWithFines,
   } = useFinesData();
 
   const { saveFine, handleSavePayment, payAllFines, isSubmitting } = useFinesActions();
@@ -224,9 +225,10 @@ export default function FinesPage() {
             createdAt: serverTimestamp(),
             paymentDate: null,
             dateImposed: fine.dateImposed,
-            recordedBy: user?.uid
+            imposedBy: user?.email || user?.uid, // Prefer email for consistency
           });
           console.log('Fine created for:', fine.dormerId);
+          console.log('Imposed by email:', user?.email);
           successCount++;
         } catch (error) {
           console.error('Error creating fine:', error);
@@ -240,6 +242,58 @@ export default function FinesPage() {
     }
 
     return { successCount, errorCount, errors };
+  };
+
+  const handleApplyRoomFine = async (roomNumber: string, amount: number, reason: string) => {
+    try {
+      // Get all dormers in the specified room
+      const dormersInRoom = dormers.filter(d => d.roomNumber === roomNumber);
+      
+      if (dormersInRoom.length === 0) {
+        toast.error(`No dormers found in Room ${roomNumber}`);
+        return;
+      }
+
+      toast.loading(`Applying fine to ${dormersInRoom.length} residents in Room ${roomNumber}...`);
+
+      // generate a unique ID for this room fine to link all individual fines
+      const roomFineId = `room_${roomNumber}_${Date.now()}`;
+      
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const dormer of dormersInRoom) {
+        try {
+          const fineData: BillFines = {
+            totalAmountDue: amount,
+            finesRemarks: `Room ${roomNumber}: ${reason}`,
+            dormerId: dormer.id,
+            dormitoryId: dormer.dormitoryId,
+            dateImposed: new Date(),
+            roomFineId, // Link all fines with this shared ID
+            roomNumber,
+          };
+
+          await saveFine(fineData, user);
+          successCount++;
+        } catch (error) {
+          console.error(`Error applying fine to ${dormer.firstName} ${dormer.lastName}:`, error);
+          errorCount++;
+        }
+      }
+
+      toast.dismiss();
+
+      if (errorCount === 0) {
+        toast.success(`Successfully applied shared ₱${amount.toFixed(2)} room fine to all ${successCount} residents in Room ${roomNumber}`);
+      } else {
+        toast.warning(`Applied fine to ${successCount} residents. ${errorCount} failed.`);
+      }
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Failed to apply room fine");
+      console.error("Room fine error:", error);
+    }
   };
 
   return (
@@ -258,6 +312,7 @@ export default function FinesPage() {
         handleNextPage={handleNextPage}
         handlePreviousPage={handlePreviousPage}
         dormers={dormers}
+        dormersWithFines={dormersWithFines}
         isSubmitting={isSubmitting}
         isImporting={isImporting}
         user={user}
@@ -275,6 +330,7 @@ export default function FinesPage() {
           setShowImportResultModal(true);
           return results;
         }}
+        onApplyRoomFine={handleApplyRoomFine}
       />
       <ImportResultModal
         isOpen={showImportResultModal}

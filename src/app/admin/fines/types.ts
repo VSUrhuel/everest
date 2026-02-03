@@ -29,6 +29,8 @@ export interface BillFines {
     finesRemarks: string;
     fineId?: string;
     dateImposed?: FirestoreDate;
+    roomFineId?: string; // links fines that share the same room fine
+    roomNumber?: string; // room number for room fines
 }
 
 /** fine payment record */
@@ -47,12 +49,17 @@ export interface PaymentFines {
     status: "Paid" | "Unpaid" | "Partially Paid";
     dateImposed?: FirestoreDate;
     recordedBy?: string;
+    imposedBy?: string;
     isDeleted?: boolean;
+    roomFineId?: string; // links fines that share the same room fine
+    roomNumber?: string; // room number for room fines
 }
 
-/** payment fine with recorded by as dormer object */
-export interface PaymentFinesData extends Omit<PaymentFines, "recordedBy"> {
+/** payment fine with recorded by and imposed by as dormer object */
+export interface PaymentFinesData extends Omit<PaymentFines, "recordedBy" | "imposedBy"> {
+    notes: boolean;
     recordedBy: Dormer;
+    imposedBy: Dormer;
 }
 
 /** imported fine from csv */
