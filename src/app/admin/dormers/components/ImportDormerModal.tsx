@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { DormerData } from "../types";
-import { FileUp, Info } from "lucide-react";
+import { FileUp, Info, AlertCircle } from "lucide-react";
 
 interface ImportDormerModalProps {
   isOpen: boolean;
@@ -29,10 +29,14 @@ export default function ImportDormerModal({
   isSubmitting,
 }: ImportDormerModalProps) {
   const [csvText, setCsvText] = useState("");
+  const [rowCount, setRowCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setCsvText(e.target.value);
+    const text = e.target.value;
+    setCsvText(text);
+    const lines = text.trim().split("\n").filter(line => line.trim());
+    setRowCount(lines.length);
   };
 
   const parseCSV = (text: string): DormerData[] => {
@@ -85,12 +89,15 @@ export default function ImportDormerModal({
     reader.onload = (event) => {
       const text = event.target?.result as string;
       setCsvText(text);
+      const lines = text.trim().split("\n").filter(line => line.trim());
+      setRowCount(lines.length);
     };
     reader.readAsText(file);
   };
 
   const handleClose = () => {
     setCsvText("");
+    setRowCount(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
     onClose();
   };
@@ -116,8 +123,23 @@ export default function ImportDormerModal({
               <p className="mt-2 text-xs italic">
                 * Each resident must be on a new line. All residents will be assigned the "User" role.
               </p>
+              <p className="mt-2 text-xs font-semibold text-blue-900">
+                💡 Best Practice: Import in batches of 50 rows or less to minimize errors and ensure faster processing.
+              </p>
             </div>
           </div>
+
+          {rowCount > 50 && (
+            <div className="bg-yellow-50 p-4 rounded-md flex gap-3 border border-yellow-200">
+              <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-semibold mb-1">Large Import Detected ({rowCount} rows)</p>
+                <p className="text-xs">
+                  You're importing {rowCount} rows. This might take a while to process. Consider splitting into smaller batches (50 rows each) for better reliability and easier error handling.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="flex justify-between items-center">
@@ -165,7 +187,11 @@ export default function ImportDormerModal({
             variant={undefined}
             size={undefined}
           >
-            {isSubmitting ? "Importing..." : "Import Residents"}
+            {isSubmitting 
+              ? rowCount > 50 
+                ? `Importing ${rowCount} dormers... This might take a while...` 
+                : "Importing dormers..." 
+              : `Import ${rowCount > 0 ? `${rowCount} ` : ""}Dormers`}
           </Button>
         </DialogFooter>
       </DialogContent>

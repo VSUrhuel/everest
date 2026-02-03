@@ -101,7 +101,7 @@ export const useFinesData = () =>{
             
             // Try to find by UID first
             let user = dormersMap.get(identifier);
-            console.log(`Resolving "${identifier}" by UID: ${user ? `Found ${user.firstName} ${user.lastName}` : 'NOT FOUND'}`);
+            //console.log(`Resolving "${identifier}" by UID: ${user ? `Found ${user.firstName} ${user.lastName}` : 'NOT FOUND'}`);
             
             // If not found and it looks like an email, try email lookup (case-insensitive)
             if (!user && identifier.includes('@')) {

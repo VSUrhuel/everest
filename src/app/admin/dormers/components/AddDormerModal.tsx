@@ -46,8 +46,8 @@ export default function AddDormerModal({
   const [roomNumber, setRoomNumber] = useState("");
   const {dormitoryName} = useCurrentDormitoryId();
   const handleSave = () => {
-    if (!firstName || !lastName || !email || !phone || !role || !roomNumber) {
-      toast.info("All fields are required.");
+    if (!firstName || !lastName || !email || !role || !roomNumber) {
+      toast.info("Please fill in all required fields.");
       return;
     }
     const dormerData: DormerData = {
@@ -141,7 +141,7 @@ export default function AddDormerModal({
             </div>
             <div>
               <Label htmlFor="phone" className={undefined}>
-                Phone <span className="text-xs text-gray-500">({phone.length}/20)</span>
+                Phone (Optional) <span className="text-xs text-gray-500">({phone.length}/20)</span>
               </Label>
               <Input
                 id="phone"
