@@ -18,12 +18,13 @@ export const getFines = (dormitoryId: string, onNext: (fines: Fine[]) => void) =
     });
 }
 
-export const addFine = async (fine: Fine, dormitoryId: string) => {
+export const addFine = async (fine: Fine, recordedBy: string = "", dormitoryId: string) => {
     try {
         await addDoc(collection(db, "fines"), {
             ...fine, 
             dormitoryId, 
             isDeleted: false,
+            recordedBy,
             createdAt: serverTimestamp()
         });
     } catch (error) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Fine, FineSummary, PaymentFines } from "../types";
+import { Fine, FineSummary, PaymentFines, PaymentFinesData } from "../types";
 import { getFines, getFinesSummary } from "@/lib/admin/fines";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 import { Dormer } from "../../dormers/types";
@@ -29,7 +29,13 @@ export const useFinesData = () =>{
                 const finesData = snapshot.docs.map(
                     (doc) => ({ id: doc.id, ...doc.data() } as PaymentFines)
                 );
-                setFines(finesData);
+                // Sort fines by createdAt in descending order (most recent first)
+                const sortedFines = finesData.sort((a, b) => {
+                    const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as any)?.toDate?.() || new Date();
+                    const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as any)?.toDate?.() || new Date();
+                    return dateB.getTime() - dateA.getTime();
+                });
+                setFines(sortedFines);
                 setLoading(false);
             }
         );
@@ -51,14 +57,21 @@ export const useFinesData = () =>{
             setLoading(false);
         }
 
+        // Fetch all dormers (including admins) for mapping recordedBy and imposedBy
         const unsubscribeDormers = onSnapshot(
               query(collection(db, "dormers"), where("dormitoryId", "==", dormitoryId)),
               (snapshot) => {
                 const dormerData = snapshot.docs
                   .map((doc) => ({ id: doc.id, ...doc.data() } as Dormer))
                   .filter(
-                    (dormer) => dormer.role === "User" && dormer.isDeleted !== true
+                    (dormer) => dormer.isDeleted !== true
                   );
+                // console.log('All dormers fetched (including admins):', dormerData.map(d => ({ 
+                //     id: d.id, 
+                //     name: `${d.firstName} ${d.lastName}`, 
+                //     role: d.role, 
+                //     email: d.email 
+                // })));
                 setDormers(dormerData);
                 setLoading(false);
               }
@@ -75,9 +88,49 @@ export const useFinesData = () =>{
 
     const dormersWithFines = useMemo(() => {
         if(!dormers.length) return [];
-        return dormers.map((dormer) => ({
+        // Create maps for both UID and email lookup (for legacy data)
+        const dormersMap = new Map(dormers.map(d => [d.id, d]));
+        const dormersByEmail = new Map(dormers.map(d => [d.email?.toLowerCase(), d]));
+        
+        // console.log('Dormers map keys (UIDs):', Array.from(dormersMap.keys()));
+        // console.log('Dormers by email keys:', Array.from(dormersByEmail.keys()));
+        
+        // Helper function to resolve user by UID or email
+        const resolveUser = (identifier: string | undefined): Dormer => {
+            if (!identifier) return { firstName: "Unknown", lastName: "User", email: "" } as Dormer;
+            
+            // Try to find by UID first
+            let user = dormersMap.get(identifier);
+            //console.log(`Resolving "${identifier}" by UID: ${user ? `Found ${user.firstName} ${user.lastName}` : 'NOT FOUND'}`);
+            
+            // If not found and it looks like an email, try email lookup (case-insensitive)
+            if (!user && identifier.includes('@')) {
+                const normalizedEmail = identifier.toLowerCase();
+                user = dormersByEmail.get(normalizedEmail);
+                //console.log(`  Trying email "${normalizedEmail}": ${user ? `Found ${user.firstName} ${user.lastName}` : 'NOT FOUND'}`);
+            }
+            
+            if (!user) {
+                console.warn(`Could not resolve user for identifier: "${identifier}"`);
+            }
+            
+            return user || { firstName: "Unknown", lastName: "User", email: "" } as Dormer;
+        };
+        
+        return dormers
+            .filter((dormer) => dormer.role !== "Admin") 
+            .map((dormer) => ({
             ...dormer,
             fines: fines.filter((fine) => fine.dormerId === dormer.id)
+            .map(fine => ({
+                ...fine,
+                recordedBy: typeof fine.recordedBy === "string"
+                    ? resolveUser(fine.recordedBy)
+                    : fine.recordedBy,
+                imposedBy: typeof fine.imposedBy === "string"
+                    ? resolveUser(fine.imposedBy)
+                    : fine.imposedBy
+            }))
         }))
     }, [dormers, fines]);
 
@@ -117,5 +170,5 @@ export const useFinesData = () =>{
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, statusFilter]);
-    return { fines, payableFines, loading, error, summary, paginatedDormers, totalPages, currentPage, searchTerm, setSearchTerm, statusFilter, setStatusFilter, handleNextPage, handlePreviousPage };
+    return { fines, payableFines, loading, error, summary, paginatedDormers, totalPages, currentPage, searchTerm, setSearchTerm, statusFilter, setStatusFilter, handleNextPage, handlePreviousPage, dormers, dormersWithFines };
 }

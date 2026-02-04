@@ -9,6 +9,9 @@ import {
 import { firestore as db } from "@/lib/firebase";
 import { User } from "firebase/auth";
 import { Payment } from "@/app/admin/payments/types";
+import { Bill } from "../../app/admin/dormers/types";
+
+interface PaymentWithBill extends Payment, Bill {}
 import { getBuiltinModule } from "process";
 import { getBill } from "./bill";
 
@@ -65,12 +68,12 @@ export const totalPayments = async (dormitoryId: string) => {
 
 export const getUserPayments = async (dormerId: string) => {
   const paymentsSnapshot = await getDocs(collection(db, "payments"));
-  const payments: any[] = [];
+  const payments: PaymentWithBill[] = [];
   for (const docSnap of paymentsSnapshot.docs) {
     const data = docSnap.data();
     if (data.dormerId === dormerId) {
       const bill = await getBill(data.billId);
-      payments.push({ id: docSnap.id, ...data, ...bill } as any);
+      payments.push({ id: docSnap.id, ...data, ...bill } as PaymentWithBill);
     }
   }
   return payments;

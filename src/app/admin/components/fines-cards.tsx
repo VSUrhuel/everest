@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, PlusIcon, Wallet } from "lucide-react";
 import { Fine } from "../fines/types";
+import { useState } from "react";
 
 interface FinesCardProps{
     fines: Fine[];
@@ -11,6 +12,9 @@ interface FinesCardProps{
 }
 
 export const FinesCards = ({fines, handleAddFine, handleEditFine}: FinesCardProps) => {
+    const [finesPage, setFinesPage] = useState(1);
+    const finesPerPage = 5;
+    
     return (
          <Card className="border border-gray-200 sm:border-2 shadow-md sm:shadow-lg bg-gradient-to-br from-white via-[#A5D6A7]/5 to-white overflow-hidden relative">
                 <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-[#A5D6A7]/10 rounded-full blur-3xl -z-0"></div>
@@ -65,15 +69,53 @@ export const FinesCards = ({fines, handleAddFine, handleEditFine}: FinesCardProp
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-2.5 sm:gap-3 md:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {fines.map((fine) => (
-                        <FineItem
-                          key={fine.id}
-                          fine={fine}
-                          onEdit={handleEditFine} // Pass the edit handler
-                        />
-                      ))}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 gap-2.5 sm:gap-3 md:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {/* Mobile: Show paginated items, Desktop: Show all */}
+                        {(typeof window !== 'undefined' && window.innerWidth < 640
+                          ? fines.slice((finesPage - 1) * finesPerPage, finesPage * finesPerPage)
+                          : fines
+                        ).map((fine) => (
+                          <FineItem
+                            key={fine.id}
+                            fine={fine}
+                            onEdit={handleEditFine}
+                          />
+                        ))}
+                      </div>
+                      
+                      {/* Pagination controls for mobile */}
+                      {fines.length > finesPerPage && (
+                        <div className="flex items-center justify-between mt-4 sm:hidden">
+                          <p className="text-xs text-gray-600">
+                            Showing {((finesPage - 1) * finesPerPage) + 1} to {Math.min(finesPage * finesPerPage, fines.length)} of {fines.length}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFinesPage(p => Math.max(1, p - 1))}
+                              disabled={finesPage === 1}
+                              className="h-8 px-3 text-xs"
+                            >
+                              Previous
+                            </Button>
+                            <span className="text-xs text-gray-700 px-2">
+                              {finesPage} / {Math.ceil(fines.length / finesPerPage)}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFinesPage(p => Math.min(Math.ceil(fines.length / finesPerPage), p + 1))}
+                              disabled={finesPage >= Math.ceil(fines.length / finesPerPage)}
+                              className="h-8 px-3 text-xs"
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>

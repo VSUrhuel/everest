@@ -29,7 +29,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Dormer } from "../../dormers/types";
-import { PaymentFines } from "../types";
+import { PaymentFines, PaymentFinesData } from "../types";
 import { serverTimestamp } from "firebase/firestore";
 
 // --- Type Definitions ---
@@ -37,7 +37,7 @@ interface FinePaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   dormer: Dormer | null;
-  fine: PaymentFines | null;
+  fine: PaymentFinesData | null;
   onSavePayment: (paymentData: any) => Promise<void>;
 }
 
@@ -77,17 +77,26 @@ export default function FinePaymentModal({
     const paymentData = {
       id: fine.id,
       dormerId: dormer.id,
+      dormitoryId: fine.dormitoryId,
       dormerDetails: {
         firstName: dormer.firstName,
         lastName: dormer.lastName,
         roomNumber: dormer.roomNumber,
         email: dormer.email,
       },
+      finesRemarks: fine.finesRemarks,
+      totalAmountDue: fine.totalAmountDue,
       amountPaid: newAmountPaid,
       paymentDate: serverTimestamp(),
       paymentMethod: paymentMethod,
       remainingBalance: newRemainingBalance,
       notes: notes,
+      billedFineId: fine.billedFineId,
+      fineId: fine.fineId,
+      imposedBy: fine.imposedBy,
+      dateImposed: fine.dateImposed,
+      roomFineId: fine.roomFineId, // Pass room fine ID if it exists
+      roomNumber: fine.roomNumber, // Pass room number if it exists
     };
     setLoading(true);
     onSavePayment(paymentData).finally(() => {

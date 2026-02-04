@@ -100,6 +100,19 @@ export default function DormitoryTable({ dorms, editDormitory, deleteDormitory }
                   </TableCell>
                 </TableRow>
               ))}
+              {dorms.length === 0 && (
+                <TableRow className={undefined}>
+                  <TableCell colSpan={5} className="text-center py-12">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <div className="text-gray-400 text-4xl">🏢</div>
+                      <div className="text-gray-500 text-lg font-medium">No dormitories found</div>
+                      <div className="text-gray-400 text-sm">
+                        No dormitories have been added yet.
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>

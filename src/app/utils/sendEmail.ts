@@ -4,6 +4,7 @@ export const sendEmail = async (emailData: {
     to: string;
     subject: string;
     html: string;
+    attachments?: any[];
   }) => {
     try {
       const response = await fetch("/api/send-email", {
