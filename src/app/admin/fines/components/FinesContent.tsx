@@ -7,6 +7,7 @@ import { Dormer } from "../../dormers/types";
 import FinesHeader from "./FinesHeader";
 import FinesSummary from "./FinesSummary";
 import ImportAttendanceModal from "./ImportAttendanceModal";
+import ExportFinesModal from "./ExportFinesModal";
 import RoomFineModal from "./RoomFineModal";
 import DormerFilters from "../../dormers/components/DormerFilters";
 import FinesTable from "./FinesTable";
@@ -79,6 +80,7 @@ export default function FinesContent({
   onApplyRoomFine,
 }: FinesContentProps) {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isRoomFineModalOpen, setIsRoomFineModalOpen] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [fineToCreate, setFineToCreate] = useState<BillFines | null>(null);
@@ -148,6 +150,7 @@ export default function FinesContent({
 
       <FinesHeader 
         onImportAttendance={() => setIsImportModalOpen(true)} 
+        onExportCSV={() => setIsExportModalOpen(true)}
         onSendEmailReminders={handleSendEmailReminders}
         onRoomFine={() => setIsRoomFineModalOpen(true)}
       />
@@ -248,6 +251,14 @@ export default function FinesContent({
       <FinesErrorModal
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
+      />
+
+      <ExportFinesModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        payableFines={payableFines}
+        fines={fines as unknown as PaymentFinesData[]}
+        dormers={dormers}
       />
     </div>
   );
