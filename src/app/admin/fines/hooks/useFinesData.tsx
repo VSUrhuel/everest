@@ -117,7 +117,9 @@ export const useFinesData = () =>{
             return user || { firstName: "Unknown", lastName: "User", email: "" } as Dormer;
         };
         
-        return dormers.map((dormer) => ({
+        return dormers
+            .filter((dormer) => dormer.role !== "Admin") 
+            .map((dormer) => ({
             ...dormer,
             fines: fines.filter((fine) => fine.dormerId === dormer.id)
             .map(fine => ({

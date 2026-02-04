@@ -226,29 +226,30 @@ export default function ImportAttendanceModal({
         <div className="py-4 space-y-4">
           <div className="bg-blue-50 p-4 rounded-md flex gap-3">
             <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-semibold mb-1">Required CSV Format:</p>
-              <code className="bg-blue-100 px-1 py-0.5 rounded">
-                Email, First Name, Last Name, 1/1/2026, 1/2/2026, ...
-              </code>
-              <p className="mt-2 text-xs italic">
-                * Leave cells <strong>empty</strong> for absences (fineable dates). Mark with "1" for present (non-fineable). Each row is a dormer's record with email as unique identifier.
-              </p>
-              <p className="mt-2 text-xs font-medium">
-                Please make sure you are following this format. 
-                <a 
-                  href="https://docs.google.com/spreadsheets/d/1T0x4CuSUsBycX0nUJk3UUKYjGEnCTg2YLWRJG5bTVOU/edit?gid=0#gid=0" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 underline ml-1 inline-flex items-center gap-1"
-                >
-                  View sample format here
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </p>
-              <p className="mt-2 text-xs font-semibold text-blue-900">
-                💡 Best Practice:  Import in batches of 50 rows or less to minimize errors and ensure faster processing.
-              </p>
+            <div className="text-sm text-blue-800 space-y-2">
+              <div>
+                <p className="font-semibold mb-1.5">CSV Format:</p>
+                <code className="bg-blue-100 px-2 py-1 rounded text-xs block w-fit">
+                  Email, First Name, Last Name, 1/1/2026, 1/2/2026, ...
+                </code>
+              </div>
+              
+              <div className="space-y-1 text-xs">
+                <p><strong>Empty cell:</strong> Marks absence (will generate fine)</p>
+                <p><strong>Cell with "1":</strong> Marks attendance (no fine)</p>
+                <p><strong>Date format:</strong> mm/dd/YYYY (e.g., 01/15/2026)</p>
+                <p><strong>Best practice:</strong> Import ≤50 rows per batch for faster processing</p>
+              </div>
+
+              <a 
+                href="https://docs.google.com/spreadsheets/d/1T0x4CuSUsBycX0nUJk3UUKYjGEnCTg2YLWRJG5bTVOU/edit?gid=0#gid=0" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-700 hover:text-blue-900 font-medium text-xs inline-flex items-center gap-1 underline"
+              >
+                View sample spreadsheet
+                <ExternalLink className="h-3 w-3" />
+              </a>
             </div>
           </div>
 
