@@ -14,7 +14,7 @@ export const MaboloRoomNumber = [
 ]
 
 export const SampaguitaRoomNumber = [
-    "101",
+    "Adviser's Room",
     "102",
     "103",
     "104",
@@ -48,6 +48,5 @@ export const SampaguitaRoomNumber = [
     "403",
     "404",
     "405",
-    "406",
-    "Adviser Room"
+    "406"
 ]

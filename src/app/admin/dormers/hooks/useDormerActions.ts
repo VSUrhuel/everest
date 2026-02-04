@@ -75,8 +75,8 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           ),
           attachments: [
             {
-              filename: "DormPay Admin User Guide.pdf",
-              path: "DormPay Admin User Guide.pdf",
+              filename: "DormPay Admin User Guide v1.2.pdf",
+              path: "DormPay Admin User Guide v1.2.pdf",
             },
           ],
         });
@@ -99,8 +99,8 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           ),
           attachments: [
             {
-              filename: "DormPay Dormer User Guide.pdf",
-              path: "DormPay Dormer User Guide.pdf",
+              filename: "DormPay Dormer User Guide v1.2.pdf",
+              path: "DormPay Dormer User Guide v1.2.pdf",
             },
           ],
         });
@@ -257,8 +257,8 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           ),
           attachments: [
             {
-              filename: "DormPay Dormer User Guide.pdf",
-              path: "DormPay Dormer User Guide.pdf",
+              filename: "DormPay Dormer User Guide v1.2.pdf",
+              path: "DormPay Dormer User Guide v1.2.pdf",
             },
           ],
         });

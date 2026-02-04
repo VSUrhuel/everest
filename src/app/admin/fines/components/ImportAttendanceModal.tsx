@@ -242,7 +242,7 @@ export default function ImportAttendanceModal({
               </div>
 
               <a 
-                href="https://docs.google.com/spreadsheets/d/1T0x4CuSUsBycX0nUJk3UUKYjGEnCTg2YLWRJG5bTVOU/edit?gid=0#gid=0" 
+                href="https://docs.google.com/spreadsheets/d/1T0x4CuSUsBycX0nUJk3UUKYjGEnCTg2YLWRJG5bTVOU/edit?usp=sharing" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-blue-700 hover:text-blue-900 font-medium text-xs inline-flex items-center gap-1 underline"
