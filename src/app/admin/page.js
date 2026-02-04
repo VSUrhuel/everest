@@ -52,6 +52,10 @@ import { toast } from "sonner";
 import { formatAmount } from "./expenses/utils";
 import { convertToHTMLTable, generateEmailHtml } from "@/lib/admin/dashboardUtils";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
+import { FinesCards } from "./components/fines-cards";
+import { useFinesData } from "./fines/hooks/useFinesData";
+import { useFinesActions } from "./fines/hooks/useFinesAction";
+import AddFineModal from "./components/add-fine-modal";
 
 function SkeletonCard() {
   return (
@@ -132,6 +136,15 @@ export default function Dashboard() {
   const [payableToEdit, setPayableToEdit] = useState(null);
 
   const { dormitoryId, loading: dormitoryIdLoading} = useCurrentDormitoryId();
+
+  // Fines Data
+  const [fineToEdit, setFineToEdit] = useState(null);
+  const [isAddFineModalOpen, setIsAddFineModalOpen] = useState(false);
+  const [payablesPage, setPayablesPage] = useState(1);
+  const payablesPerPage = 5;
+
+  const {payableFines, loading: finesLoading} = useFinesData();
+  const {addFine, updateFine, deleteFine} = useFinesActions();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -419,6 +432,22 @@ export default function Dashboard() {
     setIsAddModalOpen(true); // Open the modal for editing
   };
 
+  const handleSaveFine = async (fineData) => {
+    try {
+      if (fineData.id) {
+        await updateFine(fineData)
+        toast.success("Fine Updated Successfully!");
+      } else {
+        await addFine(fineData)
+        toast.success("New Fine Added Successfully!");
+      }
+      setIsAddFineModalOpen(false); // Close modal on success
+    } catch (error) {
+      console.error("Error saving fine:", error);
+      toast.error("There was a problem saving the fine.");
+    }
+  };
+
   const handleSavePayable = async (payableData) => {
     try {
       if (payableData.id) {
@@ -682,18 +711,74 @@ export default function Dashboard() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2.5 sm:gap-3 md:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {payables.map((payable) => (
-                <PayableItem
-                  key={payable.id}
-                  payable={payable}
-                  onEdit={handleEditPayable} // Pass the edit handler
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 gap-2.5 sm:gap-3 md:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {/* Mobile: Show paginated items, Desktop: Show all */}
+                {(typeof window !== 'undefined' && window.innerWidth < 640
+                  ? payables.slice((payablesPage - 1) * payablesPerPage, payablesPage * payablesPerPage)
+                  : payables
+                ).map((payable) => (
+                  <PayableItem
+                    key={payable.id}
+                    payable={payable}
+                    onEdit={handleEditPayable}
+                  />
+                ))}
+              </div>
+              
+              {/* Pagination controls for mobile */}
+              {payables.length > payablesPerPage && (
+                <div className="flex items-center justify-between mt-4 sm:hidden">
+                  <p className="text-xs text-gray-600">
+                    Showing {((payablesPage - 1) * payablesPerPage) + 1} to {Math.min(payablesPage * payablesPerPage, payables.length)} of {payables.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPayablesPage(p => Math.max(1, p - 1))}
+                      disabled={payablesPage === 1}
+                      className="h-8 px-3 text-xs"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-gray-700 px-2">
+                      {payablesPage} / {Math.ceil(payables.length / payablesPerPage)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPayablesPage(p => Math.min(Math.ceil(payables.length / payablesPerPage), p + 1))}
+                      disabled={payablesPage >= Math.ceil(payables.length / payablesPerPage)}
+                      className="h-8 px-3 text-xs"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+
+      <FinesCards
+        fines={payableFines}
+        handleAddFine={() => setIsAddFineModalOpen(true)}
+        handleEditFine={ (fine) => {
+          setFineToEdit(fine);
+          if(fineToEdit){
+            setIsAddFineModalOpen(true);
+          }
+        }}
+      />
+
+      <AddFineModal
+        isOpen={isAddFineModalOpen}
+        onClose={() => setIsAddFineModalOpen(false)}
+        onSave={handleSaveFine}
+        fine={fineToEdit}
+      />
 
       <AddPayableModal
         isOpen={isAddModalOpen}

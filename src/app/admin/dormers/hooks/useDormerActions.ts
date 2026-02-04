@@ -19,14 +19,14 @@ import { paymentConfirmationEmailTemplate } from "../../payments/utils/email";
 import { generateRandomPassword } from "../utils/generateRandomPass";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 import { sendEmail } from "@/app/utils/sendEmail";
+import path from "path";
 
 export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { dormitoryId, loading: dormitoryIdLoading } = useCurrentDormitoryId();
   const [errors, setErrors] = useState<string[]>([]);
-  
-  const saveDormer = async (dormerData: DormerData, user: User | null) => {
 
+  const saveDormer = async (dormerData: DormerData, user: User | null) => {
     if (!user) {
       toast.error("Authentication error. Please log in again.");
       return;
@@ -46,11 +46,9 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
         return;
       }
 
-      
-
       if (dormerData.role === "Admin") {
         const adminPassword = prompt(
-          "To add security, please enter your password:"
+          "To add security, please enter your password:",
         );
 
         if (!adminPassword) {
@@ -63,7 +61,7 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           adminEmail,
           adminPassword,
           temporaryPassword,
-          dormitoryId
+          dormitoryId,
         );
 
         toast.success("Admin dormer added successfully!");
@@ -73,16 +71,21 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           html: welcomeAdminTemplate(
             dormerData.firstName,
             dormerData.email,
-            temporaryPassword
+            temporaryPassword,
           ),
+          attachments: [
+            {
+              filename: "DormPay Admin User Guide v1.2.pdf",
+              path: "DormPay Admin User Guide v1.2.pdf",
+            },
+          ],
         });
       } else {
-
         await createUserDormer(
           dormerData,
           user,
           temporaryPassword,
-          dormitoryId
+          dormitoryId,
         );
 
         toast.success("Dormer added successfully!");
@@ -92,8 +95,14 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           html: welcomeUserTemplate(
             dormerData.firstName,
             dormerData.email,
-            temporaryPassword
+            temporaryPassword,
           ),
+          attachments: [
+            {
+              filename: "DormPay Dormer User Guide v1.2.pdf",
+              path: "DormPay Dormer User Guide v1.2.pdf",
+            },
+          ],
         });
       }
     } catch (error: any) {
@@ -116,7 +125,7 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
     }
 
     try {
-      await updateDormerDetails(dormerData.id as any,dormerData, user);
+      await updateDormerDetails(dormerData.id as any, dormerData, user);
       toast.success("Dormer updated successfully!");
     } catch (error) {
       toast.error("Error updating dormer!");
@@ -143,7 +152,7 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           html: paymentConfirmationEmailTemplate(
             dormerInfo.firstName,
             paymentData,
-            billData
+            billData,
           ),
         });
       }
@@ -178,7 +187,7 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           html: newBillTemplate(
             dormerInfo.firstName,
             billData.billingPeriod,
-            billData.totalAmountDue
+            billData.totalAmountDue,
           ),
         });
       }
@@ -203,7 +212,10 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
     }
   };
 
-  const importDormers = async (dormersList: DormerData[], user: User | null) => {
+  const importDormers = async (
+    dormersList: DormerData[],
+    user: User | null,
+  ) => {
     if (!user) {
       toast.error("Authentication error. Please log in again.");
       return { successCount: 0, errorCount: 0 };
@@ -216,7 +228,9 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
 
     for (const dormerData of dormersList) {
       try {
-        const existingDormer = dormers.find((d) => d.email === dormerData.email);
+        const existingDormer = dormers.find(
+          (d) => d.email === dormerData.email,
+        );
         if (existingDormer) {
           const errorMsg = `Dormer with email ${dormerData.email} already exists. Skipping.`;
           console.warn(errorMsg);
@@ -230,7 +244,7 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           dormerData,
           user,
           temporaryPassword,
-          dormitoryId
+          dormitoryId,
         );
 
         await sendEmail({
@@ -239,15 +253,24 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           html: welcomeUserTemplate(
             dormerData.firstName,
             dormerData.email,
-            temporaryPassword
+            temporaryPassword,
           ),
+          attachments: [
+            {
+              filename: "DormPay Dormer User Guide v1.2.pdf",
+              path: "DormPay Dormer User Guide v1.2.pdf",
+            },
+          ],
         });
 
         successCount++;
       } catch (error: any) {
         errorCount++;
         const errorMsg = error.message || String(error);
-        setErrors((prevErrors) => [...prevErrors, `${dormerData.email}: ${errorMsg}`]);
+        setErrors((prevErrors) => [
+          ...prevErrors,
+          `${dormerData.email}: ${errorMsg}`,
+        ]);
       }
     }
 

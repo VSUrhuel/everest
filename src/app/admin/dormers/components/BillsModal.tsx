@@ -131,6 +131,18 @@ export default function BillsModal({
                       </TableRow>
                     );
                   })}
+                  {dormer.bills.length === 0 && (
+                    <TableRow className={undefined}>
+                      <TableCell colSpan={5} className="text-center py-12">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <div className="text-gray-500 text-lg font-medium">No bills found</div>
+                          <div className="text-gray-400 text-sm">
+                            This dormer doesn't have any bills recorded yet.
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TabsContent>

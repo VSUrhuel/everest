@@ -11,6 +11,7 @@ import {
   Building2,
   LogOut,
   ArrowRight,
+  WalletCards,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation"; // 2. Import useRouter
@@ -69,6 +70,11 @@ const menuItems = [
     url: "/admin/events",
     icon: CalendarCheck,
   },
+  {
+    title: "Fines",
+    url: "/admin/fines",
+    icon: WalletCards,
+  }
 ];
 
 export function AppSidebar() {

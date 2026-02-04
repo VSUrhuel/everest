@@ -10,6 +10,7 @@ import {
   Building2,
   LogOut,
   ArrowRight,
+  WalletIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation"; // 2. Import useRouter
@@ -58,6 +59,11 @@ const menuItems = [
     url: "/dormer/expenses",
     icon: CircleDollarSign,
   },
+  {
+    title: "Fines",
+    url: "/dormer/fines",
+    icon: WalletIcon,
+  }
 ];
 
 export function AppSidebar() {

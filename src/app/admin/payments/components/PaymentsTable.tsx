@@ -171,6 +171,19 @@ export default function billsTable({
                     </TableRow>
                   );
                 })}
+                {bills.length === 0 && (
+                  <TableRow className={undefined}>
+                    <TableCell colSpan={7} className="text-center py-12">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <div className="text-gray-400 text-4xl">💳</div>
+                        <div className="text-gray-500 text-lg font-medium">No payments found</div>
+                        <div className="text-gray-400 text-sm">
+                          No payment records available for the selected filters.
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

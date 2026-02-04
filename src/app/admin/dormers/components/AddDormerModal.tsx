@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,8 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DormerData } from "../types";
+import { MaboloRoomNumber, SampaguitaRoomNumber } from "@/app/constants/roomNumber";
+import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 
 // --- Type Definitions ---
 interface AddDormerModalProps {
@@ -42,10 +44,10 @@ export default function AddDormerModal({
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
-
+  const {dormitoryName} = useCurrentDormitoryId();
   const handleSave = () => {
-    if (!firstName || !lastName || !email || !phone || !role || !roomNumber) {
-      toast.info("All fields are required.");
+    if (!firstName || !lastName || !email || !role || !roomNumber) {
+      toast.info("Please fill in all required fields.");
       return;
     }
     const dormerData: DormerData = {
@@ -139,7 +141,7 @@ export default function AddDormerModal({
             </div>
             <div>
               <Label htmlFor="phone" className={undefined}>
-                Phone <span className="text-xs text-gray-500">({phone.length}/20)</span>
+                Phone (Optional) <span className="text-xs text-gray-500">({phone.length}/20)</span>
               </Label>
               <Input
                 id="phone"
@@ -184,39 +186,19 @@ export default function AddDormerModal({
                 <SelectValue placeholder="Select room" />
               </SelectTrigger>
               <SelectContent className={undefined}>
-                <SelectItem value="1" className={undefined}>
-                  Room 1
-                </SelectItem>
-                <SelectItem value="2" className={undefined}>
-                  Room 2
-                </SelectItem>
-                <SelectItem value="3" className={undefined}>
-                  Room 3
-                </SelectItem>
-                <SelectItem value="4A" className={undefined}>
-                  Room 4A
-                </SelectItem>
-                <SelectItem value="4B" className={undefined}>
-                  Room 4B
-                </SelectItem>
-                <SelectItem value="5" className={undefined}>
-                  Room 5
-                </SelectItem>
-                <SelectItem value="6" className={undefined}>
-                  Room 6
-                </SelectItem>
-                <SelectItem value="7" className={undefined}>
-                  Room 7
-                </SelectItem>
-                <SelectItem value="8" className={undefined}>
-                  Room 8
-                </SelectItem>
-                <SelectItem value="9" className={undefined}>
-                  Room 9
-                </SelectItem>
-                <SelectItem value="SA Room" className={undefined}>
-                  SA Room
-                </SelectItem>
+                {dormitoryName === "Mabolo Mens Home" ? (
+                                    MaboloRoomNumber.map((room) => (
+                                      <SelectItem key={room} value={room} className={undefined} >
+                                        {room}
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    SampaguitaRoomNumber.map((room) => (
+                                      <SelectItem key={room} value={room} className={undefined}>
+                                        {room}
+                                      </SelectItem>
+                                    ))
+                                  )}
               </SelectContent>
             </Select>
           </div>

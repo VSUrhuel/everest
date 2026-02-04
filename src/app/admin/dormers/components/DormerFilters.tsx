@@ -12,6 +12,11 @@ import {
 } from "@/components/ui/select";
 import { Search, Filter, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
+import { getDormitoryData } from "@/lib/vsu-admin/dashboard";
+import { useEffect, useState } from "react";
+import { getDormitoryById } from "@/lib/vsu-admin/dormitory";
+import { MaboloRoomNumber, SampaguitaRoomNumber } from "@/app/constants/roomNumber";
 
 interface DormerFiltersProps {
   searchTerm: string;
@@ -31,7 +36,8 @@ export default function DormerFilters({
   resetFilter,
 }: DormerFiltersProps) {
   const hasActiveFilters = searchTerm || statusFilter !== "All";
-
+  const {dormitoryName}  = useCurrentDormitoryId();
+  
   return (
     <Card className="border-gray-200">
       <CardContent className="pt-4 sm:pt-6">
@@ -65,39 +71,19 @@ export default function DormerFilters({
                   <SelectItem value="All" className={undefined}>
                     All Rooms
                   </SelectItem>
-                  <SelectItem value="1" className={undefined}>
-                    Room 1
-                  </SelectItem>
-                  <SelectItem value="2" className={undefined}>
-                    Room 2
-                  </SelectItem>
-                  <SelectItem value="3" className={undefined}>
-                    Room 3
-                  </SelectItem>
-                  <SelectItem value="4A" className={undefined}>
-                    Room 4A
-                  </SelectItem>
-                  <SelectItem value="4B" className={undefined}>
-                    Room 4B
-                  </SelectItem>
-                  <SelectItem value="5" className={undefined}>
-                    Room 5
-                  </SelectItem>
-                  <SelectItem value="6" className={undefined}>
-                    Room 6
-                  </SelectItem>
-                  <SelectItem value="7" className={undefined}>
-                    Room 7
-                  </SelectItem>
-                  <SelectItem value="8" className={undefined}>
-                    Room 8
-                  </SelectItem>
-                  <SelectItem value="9" className={undefined}>
-                    Room 9
-                  </SelectItem>
-                  <SelectItem value="SA Room" className={undefined}>
-                    SA Room
-                  </SelectItem>
+                  {dormitoryName === "Mabolo Mens Home" ? (
+                    MaboloRoomNumber.map((room) => (
+                      <SelectItem key={room} value={room} className={undefined} >
+                        {room}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    SampaguitaRoomNumber.map((room) => (
+                      <SelectItem key={room} value={room} className={undefined}>
+                        {room}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

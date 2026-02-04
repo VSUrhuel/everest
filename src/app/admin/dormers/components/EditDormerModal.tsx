@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,13 +22,15 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DormerData } from "../types";
+import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
+import { MaboloRoomNumber, SampaguitaRoomNumber } from "@/app/constants/roomNumber";
 
 // --- Type Definitions ---
 interface EditDormerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (dormerData: DormerData) => void;
-  dormerData: DormerData
+  dormerData: DormerData | null;
 }
 
 // --- Component ---
@@ -38,19 +40,30 @@ export default function EditDormerModal({
   onUpdate,
   dormerData,
 }: EditDormerModalProps) {
-    if(dormerData === null) {
-        return null;
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState("");
+  const [roomNumber, setRoomNumber] = useState("");
+
+  const {dormitoryName} = useCurrentDormitoryId();
+
+  // Update state when dormerData changes
+  useEffect(() => {
+    if (dormerData) {
+      setFirstName(dormerData.firstName || "");
+      setLastName(dormerData.lastName || "");
+      setEmail(dormerData.email || "");
+      setPhone(dormerData.phone || "");
+      setRole(dormerData.role || "");
+      setRoomNumber(dormerData.roomNumber || "");
     }
-  const [firstName, setFirstName] = useState(dormerData.firstName);
-  const [lastName, setLastName] = useState(dormerData.lastName);
-  const [email, setEmail] = useState(dormerData.email);
-  const [phone, setPhone] = useState(dormerData.phone);
-  const [role, setRole] = useState(dormerData.role);
-  const [roomNumber, setRoomNumber] = useState(dormerData.roomNumber);
+  }, [dormerData, isOpen]);
 
   const handleSave = () => {
-    if (!firstName || !lastName || !email || !phone || !role || !roomNumber) {
-      toast.info("All fields are required.");
+    if (!firstName || !lastName || !email || !role || !roomNumber || !dormerData) {
+      toast.info("Please fill in all required fields.");
       return;
     }
     const dormerDetails: DormerData = {
@@ -68,12 +81,6 @@ export default function EditDormerModal({
   };
 
   const handleClose = () => {
-    setFirstName("");
-    setLastName("");
-    setEmail("");
-    setPhone("");
-    setRole("");
-    setRoomNumber("");
     onClose();
   };
 
@@ -144,7 +151,7 @@ export default function EditDormerModal({
             </div>
             <div>
               <Label htmlFor="phone" className={undefined}>
-                Phone <span className="text-xs text-gray-500">({phone.length}/20)</span>
+                Phone (Optional) <span className="text-xs text-gray-500">({phone.length}/20)</span>
               </Label>
               <Input
                 id="phone"
@@ -189,39 +196,17 @@ export default function EditDormerModal({
                 <SelectValue placeholder="Select room" />
               </SelectTrigger>
               <SelectContent className={undefined}>
-                <SelectItem value="1" className={undefined}>
-                  Room 1
-                </SelectItem>
-                <SelectItem value="2" className={undefined}>
-                  Room 2
-                </SelectItem>
-                <SelectItem value="3" className={undefined}>
-                  Room 3
-                </SelectItem>
-                <SelectItem value="4A" className={undefined}>
-                  Room 4A
-                </SelectItem>
-                <SelectItem value="4B" className={undefined}>
-                  Room 4B
-                </SelectItem>
-                <SelectItem value="5" className={undefined}>
-                  Room 5
-                </SelectItem>
-                <SelectItem value="6" className={undefined}>
-                  Room 6
-                </SelectItem>
-                <SelectItem value="7" className={undefined}>
-                  Room 7
-                </SelectItem>
-                <SelectItem value="8" className={undefined}>
-                  Room 8
-                </SelectItem>
-                <SelectItem value="9" className={undefined}>
-                  Room 9
-                </SelectItem>
-                <SelectItem value="SA Room" className={undefined}>
-                  SA Room
-                </SelectItem>
+                {dormitoryName === "Mabolo Mens Home" ? (
+                  MaboloRoomNumber.map((room) => (
+                    <SelectItem key={room} className={undefined} value={room}>
+                      {room}
+                    </SelectItem>
+                  ))
+                ): (SampaguitaRoomNumber.map((room) => (
+                  <SelectItem key={room} className={undefined} value={room}>
+                    {room}
+                  </SelectItem>
+                )))}
               </SelectContent>
             </Select>
           </div>

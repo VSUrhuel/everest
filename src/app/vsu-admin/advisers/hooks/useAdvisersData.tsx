@@ -26,7 +26,6 @@ export const useAdvisersData = () => {
                     ...doc.data()
                 })) as Dormer[]
                 setAdvisers(data)
-                console.log(data)
                 setLoading(false)
             },
             (err) => {
