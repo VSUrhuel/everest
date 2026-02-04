@@ -9,14 +9,13 @@ import { fileURLToPath } from "url";
 export async function POST(request) {
   try {
     const { to, subject, html, attachments } = await request.json();
-    const __dirname = path.dirname(fileURLToPath(import.meta.url)); // Add this
 
     // Handle attachments only if provided
     let adjustedAttachments = [];
     if (attachments && Array.isArray(attachments)) {
       adjustedAttachments = attachments.map(att => ({
         ...att,
-        path: path.join(__dirname, "../../../../public", att.path), // Build full path
+        path: path.join(process.cwd(), "public", att.path), // Build full path
       }));
 
       // checks if files exist
