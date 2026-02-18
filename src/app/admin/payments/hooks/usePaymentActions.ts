@@ -7,7 +7,7 @@ import { recordPayment } from "@/lib/admin/payment";
 import { paymentConfirmationEmailTemplate } from "../utils/email";
 import { getBill } from "@/lib/admin/bill";
 
-export function usePaymentActions(dormers: Dormer[]) {
+export function usePaymentActions(dormers: Dormer[], dormitoryId: string) {
   const sendEmail = async (emailData: {
     to: string;
     subject: string;
@@ -42,7 +42,15 @@ export function usePaymentActions(dormers: Dormer[]) {
     }
 
     try {
-      await recordPayment(paymentData, user);
+      // resolve recorder's display name from the dormers list (matched by email or uid)
+      const recorderDormer =
+        dormers.find((d) => d.id === user.uid) ||
+        dormers.find((d) => d.email === user.email);
+      const recordedByName = recorderDormer
+        ? `${recorderDormer.firstName} ${recorderDormer.lastName}`
+        : user.displayName || user.email || user.uid;
+
+      await recordPayment({ ...paymentData, recordedByName }, user, dormitoryId);
       toast.success("Payment recorded successfully!");
 
       const dormerInfo = dormers.find((d) => d.id === paymentData.dormerId);

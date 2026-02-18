@@ -20,14 +20,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { CreditCard, ChevronDown, ChevronUp } from "lucide-react";
+import { CreditCard, ChevronDown, ChevronUp, Trash2, CheckCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dormer } from "../../dormers/types";
 import { PaymentFines, PaymentFinesData } from "../types";
+import { User } from "firebase/auth";
 import { getStatusBadgeInfo } from "../../dormers/utils/badgeUtils";
 import { formatDate } from "../utils/formatDate";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { deleteFinePayment, updateFinePaymentStatus } from "@/lib/admin/fines";
+import { toast } from "sonner";
 
 interface FinesModalProps {
   isOpen: boolean;
@@ -35,6 +39,7 @@ interface FinesModalProps {
   dormer: (Dormer & { fines: PaymentFinesData[] }) | null;
   onRecordPayment: (fine: PaymentFinesData) => void;
   onPayAll: () => void;
+  user: User | null;
 }
 
 export default function FinesModal({
@@ -43,7 +48,11 @@ export default function FinesModal({
   dormer,
   onRecordPayment,
   onPayAll,
+  user,
 }: FinesModalProps) {
+  const { ConfirmDialog, confirm } = useConfirmDialog();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isExcusing, setIsExcusing] = useState(false);
   const [expandedRemarks, setExpandedRemarks] = useState<Record<string, boolean>>({});
   const [showPayAllConfirm, setShowPayAllConfirm] = useState(false);
   const [finesData, setFinesData] = useState<PaymentFinesData[]>([]);
@@ -77,9 +86,57 @@ export default function FinesModal({
     }));
   };
 
-  // calculate total unpaid amount
+  const handleDeleteFine = async (fine: PaymentFinesData) => {
+    const confirmed = await confirm({
+      title: "Delete Fine",
+      description: `Are you sure you want to permanently delete this charged fine? This action cannot be undone and will remove all associated payment records.`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
+      setIsDeleting(true);
+      try {
+        await deleteFinePayment(fine.id);
+        toast.success("Fine deleted successfully");
+        onClose(); // Close the modal after successful delete
+      } catch (error) {
+        console.error("Error deleting fine:", error);
+        toast.error("Failed to delete fine");
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const handleExcuseFine = async (fine: PaymentFinesData) => {
+    const confirmed = await confirm({
+      title: "Excuse Fine",
+      description: `Are you sure you want to excuse this fine? The fine will be marked as excused and will not be included in the total fines calculation.`,
+      confirmText: "Excuse",
+      cancelText: "Cancel",
+      variant: "default",
+    });
+
+    if (confirmed) {
+      setIsExcusing(true);
+      try {
+        await updateFinePaymentStatus(fine.id, "Excused", user?.email || user?.uid || "");
+        toast.success("Fine excused successfully");
+        onClose(); // Close the modal after successful excuse
+      } catch (error) {
+        console.error("Error excusing fine:", error);
+        toast.error("Failed to excuse fine");
+      } finally {
+        setIsExcusing(false);
+      }
+    }
+  };
+
+  // calculate total unpaid amount (excluding excused fines)
   const totalUnpaidAmount = finesData
-    .filter(fine => fine.status !== "Paid")
+    .filter(fine => fine.status !== "Paid" && fine.status !== "Excused")
     .reduce((sum, fine) => sum + (fine.totalAmountDue - fine.amountPaid), 0);
 
   return (
@@ -118,7 +175,7 @@ export default function FinesModal({
                   </div>
                 </div>
               )}
-              {finesData.some(fine => fine.status !== "Paid") && (
+              {finesData.some(fine => fine.status !== "Paid" && fine.status !== "Excused") && (
                 <Button
                     onClick={() => setShowPayAllConfirm(true)}
                     disabled={isPayingAll}
@@ -152,17 +209,20 @@ export default function FinesModal({
                     <div className="h-5 w-1 bg-blue-600 rounded"></div>
                     <h3 className="text-sm font-semibold text-gray-700">Shared Fines by Room</h3>
                     <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300">
-                      {roomFines.filter(f => f.status !== "Paid").length} Active
+                      {roomFines.filter(f => f.status !== "Paid" && f.status !== "Excused").length} Active
                     </Badge>
                   </div>
                   <Card className="border-blue-200 bg-blue-50/30">
                     <CardContent className="p-4 space-y-3">
                       {roomFines.map((fine) => {
-                        const { className, Icon } = getStatusBadgeInfo(fine.status);
+                        const statusForBadge = fine.status === "Excused" ? "Paid" : (fine.status as "Paid" | "Unpaid" | "Partially Paid" | "Overdue");
+                        const { className, Icon } = getStatusBadgeInfo(statusForBadge as "Paid" | "Unpaid" | "Partially Paid" | "Overdue");
                         const isPaid = fine.status === "Paid";
+                        const isExcused = fine.status === "Excused";
+                        const isInactive = isPaid || isExcused;
                         
                         return (
-                          <div key={fine.id} className={`flex items-center justify-between p-3 rounded-md border ${isPaid ? 'bg-gray-50 border-gray-200' : 'bg-white border-blue-200'}`}>
+                          <div key={fine.id} className={`flex items-center justify-between p-3 rounded-md border ${isInactive ? 'bg-gray-50 border-gray-200' : 'bg-white border-blue-200'}`}>
                             <div className="flex-1 space-y-1">
                               <div className="flex items-center gap-2">
                                 <p className="font-medium text-sm">{fine.finesRemarks}</p>
@@ -202,7 +262,7 @@ export default function FinesModal({
                                   </div>
                                 )}
                                 
-                                {isPaid && fine.recordedBy && (
+                                {fine.recordedBy && (fine.status === "Paid" || fine.status === "Excused") && (
                                   <div className="flex items-center gap-2">
                                     <span className="text-gray-500">Recorded by:</span>
                                     <div className="flex items-center gap-1.5">
@@ -224,15 +284,40 @@ export default function FinesModal({
                                 <p className="text-xs text-blue-600 italic">{fine.notes}</p>
                               )}
                             </div>
-                            <div className="ml-4">
-                              {!isPaid && (
+                            <div className="ml-4 flex gap-2">
+                              {!isInactive && (
                                 <Button
                                   onClick={() => onRecordPayment(fine)}
                                   size="sm"
                                   variant="outline"
                                   className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                                  disabled={isDeleting || isExcusing}
                                 >
                                   Pay Fine
+                                </Button>
+                              )}
+                              {!isInactive && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleExcuseFine(fine)}
+                                  className="h-9 bg-yellow-600 hover:bg-yellow-700 text-white"
+                                  variant={undefined}
+                                  disabled={isDeleting || isExcusing}
+                                  title="Excuse fine"
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {!isInactive && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleDeleteFine(fine)}
+                                  className="h-9 bg-red-600 hover:bg-red-700 text-white"
+                                  variant={undefined}
+                                  disabled={isDeleting || isExcusing}
+                                  title="Delete fine"
+                                >
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               )}
                             </div>
@@ -269,7 +354,8 @@ export default function FinesModal({
                 </TableHeader>
                 <TableBody className={undefined}>
                   {individualFines.map((fine) => {
-                    const { className, Icon } = getStatusBadgeInfo(fine.status);
+                    const statusForBadge = fine.status === "Excused" ? "Paid" : (fine.status as "Paid" | "Unpaid" | "Partially Paid" | "Overdue");
+                    const { className, Icon } = getStatusBadgeInfo(statusForBadge);
                     const isExpanded = expandedRemarks[fine.id] || false;
                     const shouldTruncate = fine.finesRemarks && fine.finesRemarks.length > 20;
                     
@@ -370,18 +456,46 @@ export default function FinesModal({
                               <span className="truncate">{fine.status}</span>
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right w-[120px]">
-                            {(fine.status === "Unpaid" ||
-                              fine.status === "Partially Paid") && (
-                              <Button
-                                size="sm"
-                                onClick={() => onRecordPayment(fine)}
-                                className="h-8 bg-red-600 hover:bg-red-700 text-white whitespace-nowrap"
-                                variant={undefined}
-                              >
-                                <CreditCard className="h-4 w-4 mr-1" /> Pay
-                              </Button>
-                            )}
+                          <TableCell className="text-right w-[180px]">
+                            <div className="flex gap-2 justify-end">
+                              {(fine.status === "Unpaid" ||
+                                fine.status === "Partially Paid") && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => onRecordPayment(fine)}
+                                  className="h-8 bg-red-600 hover:bg-red-700 text-white whitespace-nowrap"
+                                  variant={undefined}
+                                  disabled={isDeleting || isExcusing}
+                                >
+                                  <CreditCard className="h-4 w-4 mr-1" /> Pay
+                                </Button>
+                              )}
+                              {(fine.status === "Unpaid" ||
+                                fine.status === "Partially Paid") && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleExcuseFine(fine)}
+                                  className="h-8 bg-yellow-600 hover:bg-yellow-700 text-white"
+                                  variant={undefined}
+                                  disabled={isDeleting || isExcusing}
+                                  title="Excuse fine"
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {fine.status !== "Paid" && fine.status !== "Excused" && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleDeleteFine(fine)}
+                                  className="h-8 bg-red-600 hover:bg-red-700 text-white"
+                                  variant={undefined}
+                                  disabled={isDeleting || isExcusing}
+                                  title="Delete fine"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                         
@@ -541,6 +655,7 @@ export default function FinesModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <ConfirmDialog />
     </>
   );
 }

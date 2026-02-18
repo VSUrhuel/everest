@@ -211,13 +211,14 @@ export default function FinesContent({
         isOpen={modal === "bills"}
         onClose={closeModal}
         dormer={selectedDormer}
+        user={user}
         onRecordPayment={(fine: PaymentFinesData) =>
           openModal("payment", selectedDormer, fine)
         }
         onPayAll={() => {
           const dormersMap = new Map(dormers.map(d => [d.id, d]));
           const recordedByDormer = dormers.find(d => d.email === user?.email);
-          payAllFines(selectedDormer?.fines.filter(f => f.status !== "Paid") || [], user, dormersMap, recordedByDormer);
+          payAllFines(selectedDormer?.fines.filter(f => f.status !== "Paid" && f.status !== "Excused") || [], user, dormersMap, recordedByDormer);
         }}
       />
 

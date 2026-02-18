@@ -85,9 +85,16 @@ export default function PaymentDetailsModal({
                       </span>
                     </TableCell>
                     <TableCell className="w-[200px]">
-                      <span className="truncate block" title={`${payment.recordedByUser?.firstName ?? "N/A"} ${payment.recordedByUser?.lastName ?? ""}`}>
-                        {payment.recordedByUser?.firstName ?? "N/A"}{" "}
-                        {payment.recordedByUser?.lastName ?? ""}
+                      <span className="truncate block" title={
+                        payment.recordedByName ||
+                        (payment.recordedByUser
+                          ? `${payment.recordedByUser.firstName} ${payment.recordedByUser.lastName}`
+                          : "N/A")
+                      }>
+                        {payment.recordedByName ||
+                          (payment.recordedByUser
+                            ? `${payment.recordedByUser.firstName} ${payment.recordedByUser.lastName}`
+                            : "N/A")}
                       </span>
                     </TableCell>
                   </TableRow>

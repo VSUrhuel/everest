@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Eye, CreditCard, Calendar, Receipt } from "lucide-react";
 import { Bill } from "../../dormers/types";
 import { getStatusBadgeInfo } from "../../dormers/utils/badgeUtils";
+import { getBillingPeriodLabel } from "../../dormers/utils/generateBillUtils";
 
 /**
  * @param {{
@@ -76,6 +77,7 @@ export default function billsTable({
               <TableHeader className={undefined}>
                 <TableRow className="hover:bg-transparent border-b border-gray-100">
                   <TableHead className="font-semibold text-gray-700">Resident</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Remarks</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Amount Due</TableHead>
                   <TableHead className="font-semibold text-gray-700">Amount Paid</TableHead>
                   <TableHead className="font-semibold text-gray-700">Remaining Balance</TableHead>
@@ -101,10 +103,15 @@ export default function billsTable({
                             <div className="font-semibold text-[#333333] max-w-[200px] truncate" title={`${bill.dormer.firstName} ${bill.dormer.lastName}`}>
                               {bill.dormer.firstName} {bill.dormer.lastName}
                             </div>
-                            <div className="text-xs text-gray-500 truncate" title={`Room ${bill.dormer.roomNumber} • ${bill.billingPeriod}`}>
-                              Room {bill.dormer.roomNumber} • {bill.billingPeriod}
+                            <div className="text-xs text-gray-500 truncate" title={`Room ${bill.dormer.roomNumber} • ${getBillingPeriodLabel(bill.billingPeriod)}`}>
+                              Room {bill.dormer.roomNumber} • {getBillingPeriodLabel(bill.billingPeriod)}
                             </div>
                           </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="w-[180px]">
+                        <div className="text-sm text-gray-600 truncate max-w-[180px]" title={bill.description || "N/A"}>
+                          {bill.description || "N/A"}
                         </div>
                       </TableCell>
                       <TableCell className="w-[150px]">
@@ -112,7 +119,7 @@ export default function billsTable({
                           {formatCurrency(bill.totalAmountDue)}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {bill.billingPeriod}
+                          {getBillingPeriodLabel(bill.billingPeriod)}
                         </div>
                       </TableCell>
                       <TableCell className="w-[150px]">

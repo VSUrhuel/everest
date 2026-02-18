@@ -156,10 +156,12 @@ export const recordPaymentTransaction = async (
       newStatus = "Partially Paid";
     }
 
-    await addDoc(collection(db, "payments"), {
+    const paymentRef = doc(collection(db, "payments"));
+    transaction.set(paymentRef, {
       ...paymentData,
       dormitoryId,
       recordedBy: user.uid,
+      recordedByName: paymentData.recordedByName || user.displayName || user.email || user.uid,
       createdAt: serverTimestamp(),
     });
 
