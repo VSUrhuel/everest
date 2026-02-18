@@ -11,6 +11,7 @@ import {
   getDocs,
   query,
   where,
+  deleteDoc,
 } from "firebase/firestore";
 import { firestore as db } from "@/lib/firebase";
 import { Bill } from "../../app/admin/dormers/types";
@@ -99,5 +100,160 @@ export const getBills = async (userId: string, dormitoryId: string): Promise<any
   } catch (error) {
     console.error("Error fetching bills:", error);
     throw new Error("Failed to load bills");
+  }
+};
+
+
+// effectively checks duplicate bills for non-monthly billing periods as well by normalizing the billing period before comparison
+export const normalizeBillingPeriod = (billingPeriod: string): string => {
+  // Already in YYYY-MM format
+  if (/^\d{4}-\d{2}$/.test(billingPeriod)) {
+    return billingPeriod;
+  }
+
+  // Already a semester key (e.g. "2nd-semester (Jan - May 2026)")
+  if (billingPeriod.includes("semester")) {
+    return billingPeriod;
+  }
+
+  // Human-readable "Month YYYY" (e.g. "August 2025") → "2025-08"
+  const monthYearMatch = billingPeriod.match(
+    /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})$/i
+  );
+  if (monthYearMatch) {
+    const monthNames = [
+      "january", "february", "march", "april", "may", "june",
+      "july", "august", "september", "october", "november", "december",
+    ];
+    const monthIndex = monthNames.indexOf(monthYearMatch[1].toLowerCase()) + 1;
+    const year = monthYearMatch[2];
+    return `${year}-${monthIndex.toString().padStart(2, "0")}`;
+  }
+
+  // Fallback: return unchanged
+  return billingPeriod;
+};
+
+/**
+ * Find an existing bill for a specific dormer, billing period, and payable
+ * Returns the bill ID if found, null otherwise
+ * Excludes soft-deleted bills from the search
+ * Normalizes billing period to handle both old and new formats
+ */
+export const findExistingBill = async (
+  dormerId: string,
+  billingPeriod: string,
+  payableId: string
+): Promise<string | null> => {
+  try {
+    // Normalize the billing period to handle both old and new formats
+    const normalizedPeriod = normalizeBillingPeriod(billingPeriod);
+    
+    const existingBillsQuery = query(
+      collection(db, "bills"),
+      where("dormerId", "==", dormerId),
+      where("billingPeriod", "==", normalizedPeriod),
+      where("payableId", "==", payableId)
+    );
+
+    const existingBillsSnapshot = await getDocs(existingBillsQuery);
+    
+    // Find the first non-deleted bill
+    for (const doc of existingBillsSnapshot.docs) {
+      const billData = doc.data();
+      if (!billData.isDeleted) {
+        return doc.id;
+      }
+    }
+    
+    // If no exact match found with normalized period, try searching with the original format
+    // This helps catch bills stored with the old format
+    if (normalizedPeriod !== billingPeriod) {
+      const fallbackQuery = query(
+        collection(db, "bills"),
+        where("dormerId", "==", dormerId),
+        where("billingPeriod", "==", billingPeriod),
+        where("payableId", "==", payableId)
+      );
+      
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      for (const doc of fallbackSnapshot.docs) {
+        const billData = doc.data();
+        if (!billData.isDeleted) {
+          return doc.id;
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error finding existing bill:", error);
+    return null;
+  }
+};
+
+/**
+ * Check if a bill with the given criteria has been paid or partially paid
+ * Returns true if a paid/partially paid bill exists
+ * Excludes soft-deleted bills from the check
+ * Normalizes billing period to handle both old and new formats
+ */
+
+
+export const isPaidBill = async (
+  dormerId: string,
+  billingPeriod: string,
+  payableId: string
+): Promise<boolean> => {
+  try {
+    // Normalize the billing period to handle both old and new formats
+    const normalizedPeriod = normalizeBillingPeriod(billingPeriod);
+    
+    const existingBillsQuery = query(
+      collection(db, "bills"),
+      where("dormerId", "==", dormerId),
+      where("billingPeriod", "==", normalizedPeriod),
+      where("payableId", "==", payableId)
+    );
+
+    const existingBillsSnapshot = await getDocs(existingBillsQuery);
+    
+    // Check if any non-deleted bill is paid or partially paid
+    for (const doc of existingBillsSnapshot.docs) {
+      const billData = doc.data();
+      if (
+        !billData.isDeleted &&
+        (billData.status === "Paid" || billData.status === "Partially Paid")
+      ) {
+        return true;
+      }
+    }
+    
+    // If no exact match found with normalized period, try searching with the original format
+    // This helps catch bills stored with the old format
+    if (normalizedPeriod !== billingPeriod) {
+      const fallbackQuery = query(
+        collection(db, "bills"),
+        where("dormerId", "==", dormerId),
+        where("billingPeriod", "==", billingPeriod),
+        where("payableId", "==", payableId)
+      );
+      
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      for (const doc of fallbackSnapshot.docs) {
+        const billData = doc.data();
+        if (
+          !billData.isDeleted &&
+          (billData.status === "Paid" || billData.status === "Partially Paid")
+        ) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("Error checking for paid bills:", error);
+    return false;
   }
 };

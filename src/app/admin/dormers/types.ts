@@ -25,12 +25,13 @@ export interface Bill {
   status: "Paid" | "Unpaid" | "Partially Paid" | "Overdue";
   totalAmountDue: number;
   amountPaid: number;
-  description: string;
+  description: string; 
+  payableId: string; 
   updatedAt: any;
   isDeleted?: boolean;
 }
 
-export interface Payable {
+export interface Payable { //regular chanrge
   id: string;
   name: string;
   amount: number;
@@ -46,6 +47,7 @@ export type ModalType =
   | "edit"
   | "delete"
   | "import"
+  | "importBills"
   | null;
 
 export interface DormerData {
@@ -68,4 +70,20 @@ export interface AdviserData {
   role: string;
   dormitoryId?: string;
   dormitoryName?: string;
+}
+
+export interface ImportedBill {
+  email: string;
+  firstName: string;
+  lastName: string;
+  billingPeriod: string;
+  rowNumber: number;
+  isParsingError?: boolean;
+  error?: string;
+}
+
+export interface MappedBill extends ImportedBill {
+  dormerId: string;
+  dormitoryId: string;
+  originalIndex: number;
 }
