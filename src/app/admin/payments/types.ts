@@ -15,6 +15,7 @@ export interface Payment {
   paymentMethod: string;
   notes: string;
   recordedBy: string;
+  recordedByName?: string;
   createdAt: any;
 }
 

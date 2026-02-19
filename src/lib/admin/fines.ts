@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore"
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore"
 import { firestore as db } from "../firebase"
 import { Fine, FineSummary, PaymentFines } from "@/app/admin/fines/types";
 
@@ -51,6 +51,57 @@ export const deleteFine = async (fine: Fine) => {
         });
     } catch (error) {
         throw error
+    }
+}
+
+/**
+ * Permanently deletes a fine from the database (hard delete)
+ * @param fineId - The ID of the fine to delete
+ * @throws Error if the deletion fails
+ */
+export const deleteFineHard = async (fineId: string): Promise<void> => {
+    try {
+        await deleteDoc(doc(db, "fines", fineId));
+    } catch (error) {
+        console.error("Error deleting fine:", error);
+        throw error;
+    }
+}
+
+/**
+ * Permanently deletes a fine payment from the database (hard delete)
+ * @param paymentId - The ID of the fine payment to delete
+ * @throws Error if the deletion fails
+ */
+export const deleteFinePayment = async (paymentId: string): Promise<void> => {
+    try {
+        await deleteDoc(doc(db, "finesPayment", paymentId));
+    } catch (error) {
+        console.error("Error deleting fine payment:", error);
+        throw error;
+    }
+}
+
+/**
+ * Updates the status of a fine payment
+ * @param paymentId - The ID of the fine payment to update
+ * @param status - The new status
+ * @param recordedBy - The user who recorded this action
+ * @throws Error if the update fails
+ */
+export const updateFinePaymentStatus = async (paymentId: string, status: "Paid" | "Unpaid" | "Partially Paid" | "Excused", recordedBy?: string): Promise<void> => {
+    try {
+        const updateData: any = {
+            status,
+            updatedAt: serverTimestamp()
+        };
+        if (recordedBy) {
+            updateData.recordedBy = recordedBy;
+        }
+        await updateDoc(doc(db, "finesPayment", paymentId), updateData);
+    } catch (error) {
+        console.error("Error updating fine payment status:", error);
+        throw error;
     }
 }
 

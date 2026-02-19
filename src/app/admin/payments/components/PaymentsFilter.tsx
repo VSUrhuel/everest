@@ -108,7 +108,7 @@ export default function PaymentsFilter({
                 <SelectItem value="All" className={undefined}>
                   All Periods
                 </SelectItem>
-                {billingPeriods?.map((period) => (
+                {billingPeriods?.filter(period => period && period.trim() !== '').map((period) => (
                   <SelectItem key={period} value={period} className={undefined}>
                     {period}
                   </SelectItem>

@@ -28,10 +28,15 @@ import { formatAmount } from "@/app/admin/expenses/utils";
 import { calculatePaymentSummary } from "./utils/paymentSummary";
 import { getBills } from "@/lib/admin/bill";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { firestore as db } from "@/lib/firebase";
+import { getBillDescription } from "@/app/admin/dormers/hooks/useBillDescription";
+import type { Payable } from "@/app/admin/dormers/types";
 
 export default function PaymentsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [userPayments, setUserPayments] = useState<any[]>([]);
+  const [payables, setPayables] = useState<Payable[]>([]);
   const [loading, setLoading] = useState(true);
   const { dormitoryId, loading: dormitoryLoading } = useCurrentDormitoryId();
   useEffect(() => {
@@ -66,6 +71,25 @@ export default function PaymentsPage() {
     };
     fetchUserPayments();
   }, [user, dormitoryId]);
+
+  useEffect(() => {
+    if (!dormitoryId) return;
+
+    const q = query(
+      collection(db, "regularCharge"),
+      where("dormitoryId", "==", dormitoryId)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const payablesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Payable[];
+      setPayables(payablesData);
+    });
+
+    return () => unsubscribe();
+  }, [dormitoryId]);
 
   // Add loading state
   if (loading) {
@@ -131,6 +155,9 @@ export default function PaymentsPage() {
                         Billing Period
                       </TableHead>
                       <TableHead className="font-bold text-[#12372A] text-xs sm:text-sm">
+                        Remarks
+                      </TableHead>
+                      <TableHead className="font-bold text-[#12372A] text-xs sm:text-sm">
                         Amount Due
                       </TableHead>
                       <TableHead className="font-bold text-[#12372A] text-xs sm:text-sm">
@@ -153,12 +180,18 @@ export default function PaymentsPage() {
                           Number(payment.amountPaid)
                       );
                       const isFullyPaid = remainingBalance === 0;
+                      const billDescription = getBillDescription(payment, payables);
 
                       return (
                         <TableRow key={payment.id} className="hover:bg-[#f0f0f0] transition-colors">
                           <TableCell className="font-semibold text-[#333333] text-xs sm:text-sm w-[150px]">
                             <span className="truncate block" title={payment.billingPeriod}>
                               {payment.billingPeriod}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-semibold text-[#333333] text-xs sm:text-sm w-[200px]">
+                            <span className="truncate block" title={billDescription}>
+                              {billDescription}
                             </span>
                           </TableCell>
                           <TableCell className="font-semibold text-[#333333] text-xs sm:text-sm w-[120px]">
@@ -207,7 +240,7 @@ export default function PaymentsPage() {
                     })}
                     {userPayments.length === 0 && (
                       <TableRow className={undefined}>
-                        <TableCell colSpan={7} className="text-center py-12">
+                      <TableCell colSpan={7} className="text-center py-12">
                           <div className="flex flex-col items-center justify-center space-y-2">
                             <div className="text-gray-400 text-4xl">💳</div>
                             <div className="text-gray-500 text-lg font-medium">No payments found</div>

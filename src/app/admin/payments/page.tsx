@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, firestore as db } from "@/lib/firebase";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { Button } from "@/components/ui/button";
 import PaymentsTable from "./components/PaymentsTable";
@@ -40,10 +40,12 @@ export default function PaymentsContent() {
     totalPages,
     handleNextPage,
     handlePreviousPage,
+    dormitoryId,
   } = usePaymentsData();
 
   const { handleRecordPayment } = usePaymentActions(
-    paginatedBills.map((b) => b.dormer)
+    paginatedBills.map((b) => b.dormer),
+    dormitoryId
   );
 
   const [selectedBill, setSelectedBill] = useState<BillData | null>(null);
@@ -56,6 +58,14 @@ export default function PaymentsContent() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Keep selectedBill in sync with live data so the details modal
+  // always reflects the latest payments after a new payment is recorded.
+  useEffect(() => {
+    if (!selectedBill) return;
+    const updated = combinedBillData.find((b) => b.id === selectedBill.id);
+    if (updated) setSelectedBill(updated);
+  }, [combinedBillData]);
 
   const handleViewDetails = (bill: BillData) => {
     setSelectedBill(bill);
@@ -92,7 +102,9 @@ export default function PaymentsContent() {
   return (
     <div className="min-h-screen bg-[#f0f0f0] p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-5 md:space-y-6">
       <ConfirmDialog />
-      <PaymentHeader onExport={handleExportWithConfirm} />
+      <PaymentHeader 
+        onExport={handleExportWithConfirm}
+      />
 
       <SummaryCards
         totalAmountDue={summaryStats.totalAmountDue}

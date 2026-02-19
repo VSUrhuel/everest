@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
@@ -26,6 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Dormer, Payable, Bill } from "../types";
 import { generateBillingPeriods } from "../utils/generateBillUtils";
+import { findExistingBill, isPaidBill } from "@/lib/admin/bill";
 
 // --- Type Definitions ---
 interface GenerateBillModalProps {
@@ -52,27 +52,21 @@ export default function GenerateBillModal({
   setShowErrorModal,
   setBillToCreate,
 }: GenerateBillModalProps) {
-  const [selectedPayables, setSelectedPayables] = useState<
-    Record<string, boolean>
-  >({});
+  const [selectedPayableId, setSelectedPayableId] = useState<string>("");
   const [totalAmount, setTotalAmount] = useState(0);
   const [billingPeriod, setBillingPeriod] = useState("");
-  const [description, setDescription] = useState("");
 
   const billingPeriods = useMemo(() => generateBillingPeriods(), []);
 
   useEffect(() => {
-    const newTotal = payables.reduce((sum, payable) => {
-      return selectedPayables[payable.id] ? sum + payable.amount : sum;
-    }, 0);
-    setTotalAmount(newTotal);
-  }, [selectedPayables, payables]);
+    const selectedPayable = payables.find(p => p.id === selectedPayableId);
+    setTotalAmount(selectedPayable ? selectedPayable.amount : 0);
+  }, [selectedPayableId, payables]);
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedPayables({});
+      setSelectedPayableId("");
       setTotalAmount(0);
-      setDescription("");
       if (billingPeriods.length > 0) {
         setBillingPeriod(billingPeriods[0].value);
       }
@@ -80,39 +74,18 @@ export default function GenerateBillModal({
   }, [isOpen, dormer, billingPeriods]);
 
   const handlePayableChange = (payableId: string) => {
-    setSelectedPayables((prev) => ({
-      ...prev,
-      [payableId]: !prev[payableId],
-    }));
+    setSelectedPayableId(payableId);
   };
 
   if (!dormer) return null;
 
-  const findExistingBillId = (dormerId: string, billingPeriod: string) => {
-    const existingBill = bills.find(
-      (bill) =>
-        bill.dormerId === dormerId && bill.billingPeriod === billingPeriod
-    );
-    return existingBill ? existingBill.id : null;
-  };
-
-  const alreadyPaidBill = (dormerId: string, billingPeriod: string) => {
-    const existingBill = bills.find(
-      (bill) =>
-        bill.dormerId === dormerId &&
-        bill.billingPeriod === billingPeriod &&
-        (bill.status === "Paid" || bill.status === "Partially Paid")
-    );
-    return !!existingBill;
-  };
-
-  const handleGenerateBill = () => {
+  const handleGenerateBill = async () => {
     if (!billingPeriod) {
       toast.info("Please select a billing period.");
       return;
     }
-    if (totalAmount <= 0) {
-      toast.info("Please select at least one payable to generate a bill.");
+    if (!selectedPayableId || totalAmount <= 0) {
+      toast.info("Please select a payable to generate a bill.");
       return;
     }
     if (dormer.id === undefined || dormer.id === null) {
@@ -120,23 +93,33 @@ export default function GenerateBillModal({
       return;
     }
 
+    const selectedPayable = payables.find(p => p.id === selectedPayableId);
+    if (!selectedPayable) {
+      toast.error("Selected payable not found.");
+      return;
+    }
+
     const billData = {
       dormerId: dormer.id,
       billingPeriod,
       status: "Unpaid" as Bill["status"],
-      totalAmountDue: totalAmount,
-      description: description,
+      totalAmountDue: selectedPayable.amount,
+      description: selectedPayable.name,
+      payableId: selectedPayable.id,
       amountPaid: 0,
     };
 
-    if (alreadyPaidBill(billData.dormerId, billData.billingPeriod)) {
+    // Check database directly for most up-to-date data
+    const isPaid = await isPaidBill(billData.dormerId, billData.billingPeriod, billData.payableId);
+    if (isPaid) {
       setShowErrorModal(true);
       return;
     }
 
-    const existingBillId = findExistingBillId(
+    const existingBillId = await findExistingBill(
       billData.dormerId,
-      billData.billingPeriod
+      billData.billingPeriod,
+      billData.payableId
     );
 
     if (existingBillId) {
@@ -199,43 +182,25 @@ export default function GenerateBillModal({
           <Separator className={undefined} />
 
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="payables" className="text-base font-semibold">
-                Payables
-              </Label>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Running Total</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  ₱{totalAmount.toFixed(2)}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2 p-4 border rounded-lg bg-slate-50">
-              {payables.map((payable) => (
-                <div
-                  key={payable.id}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      id={payable.id}
-                      checked={!!selectedPayables[payable.id]}
-                      onCheckedChange={() => handlePayableChange(payable.id)}
-                      className={undefined}
-                    />
-                    <Label
-                      htmlFor={payable.id}
-                      className="font-normal text-sm cursor-pointer"
-                    >
-                      {payable.name}
-                    </Label>
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">
-                    ₱{payable.amount.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <Label htmlFor="payable" className="text-base font-semibold">
+              Select Payable
+            </Label>
+            <Select value={selectedPayableId} onValueChange={handlePayableChange}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select a payable" />
+              </SelectTrigger>
+              <SelectContent className={undefined}>
+                {payables.map((payable) => (
+                  <SelectItem
+                    key={payable.id}
+                    value={payable.id}
+                    className={undefined}
+                  >
+                    {payable.name} - ₱{payable.amount.toFixed(2)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -248,20 +213,6 @@ export default function GenerateBillModal({
               value={`₱ ${totalAmount.toFixed(2)}`}
               readOnly
               className="mt-1 bg-gray-100 font-semibold text-gray-800"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="description" className={undefined}>
-              Description / Notes <span className="text-xs text-gray-500">({description.length}/500)</span>
-            </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g., Monthly charges for October, including maintenance and WiFi."
-              className="mt-1"
-              maxLength={500}
             />
           </div>
         </div>

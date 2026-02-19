@@ -4,13 +4,13 @@ export const generateBillingPeriods = () => {
   const now = new Date();
   const year = now.getFullYear()-1;
 
-  const firstSemStart = new Date(year, 7, 1); 
-  const firstSemEnd = new Date(year, 11, 1); 
-  const firstSemLabel = `${firstSemStart.toLocaleString("en-US", { month: "short" })} - ${firstSemEnd.toLocaleString("en-US", { month: "short", year: "numeric" })}`;
-  periods.push({
-    value: `1st-semester (${firstSemLabel})`,
-    label: `1st Semester (${firstSemLabel})`,
-  });
+  // const firstSemStart = new Date(year, 7, 1); 
+  // const firstSemEnd = new Date(year, 11, 1); 
+  // const firstSemLabel = `${firstSemStart.toLocaleString("en-US", { month: "short" })} - ${firstSemEnd.toLocaleString("en-US", { month: "short", year: "numeric" })}`;
+  // periods.push({
+  //   value: `1st-semester (${firstSemLabel})`,
+  //   label: `1st Semester (${firstSemLabel})`,
+  // });
   
   const secondSemYear = year + 1;
   const secondSemStart = new Date(secondSemYear, 0, 1); // January
@@ -40,4 +40,26 @@ export const generateBillingPeriods = () => {
     });
   }
   return periods;
+};
+
+export const getBillingPeriodLabel = (billingPeriod: string): string => {
+  // Check if it's a semester period
+  if (billingPeriod.includes("semester")) {
+    // Extract the label part (e.g., "1st Semester (Aug - Dec 2024)")
+    const match = billingPeriod.match(/\d(?:st|nd)-semester\s*\((.*?)\)/);
+    if (match) {
+      return `${billingPeriod.substring(0, billingPeriod.indexOf("(") - 1)} (${match[1]})`;
+    }
+    return billingPeriod;
+  }
+
+  // Check if it's a month-year format (e.g., "2025-08")
+  if (/^\d{4}-\d{2}$/.test(billingPeriod)) {
+    const [year, month] = billingPeriod.split("-");
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return date.toLocaleString("en-US", { month: "long", year: "numeric" });
+  }
+
+  // Fallback: return as is
+  return billingPeriod;
 };
