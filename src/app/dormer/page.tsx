@@ -110,6 +110,7 @@ export default function UserDashboard() {
           // mock bills data for non-empty state testing
           const mockBills: Bill[] = [
             {
+              payableId: "1",
               id: "1",
               dormerId: user.uid,
               billingPeriod: "January 2025",
@@ -123,6 +124,7 @@ export default function UserDashboard() {
               updatedAt: new Date()
             },
             {
+              payableId: "2",
               id: "2",
               dormerId: user.uid,
               billingPeriod: "February 2025",
@@ -136,6 +138,7 @@ export default function UserDashboard() {
               updatedAt: new Date()
             },
             {
+              payableId: "3",
               id: "3",
               dormerId: user.uid,
               billingPeriod: "March 2025",
@@ -149,6 +152,7 @@ export default function UserDashboard() {
               updatedAt: new Date()
             },
             {
+              payableId: "4",
               id: "4",
               dormerId: user.uid,
               billingPeriod: "April 2025",
@@ -162,6 +166,7 @@ export default function UserDashboard() {
               updatedAt: new Date()
             },
             {
+              payableId: "5",
               id: "5",
               dormerId: user.uid,
               billingPeriod: "May 2025",

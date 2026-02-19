@@ -46,7 +46,7 @@ export interface PaymentFines {
     finesRemarks: string;
     fineId?: string;
     createdAt: Timestamp;
-    status: "Paid" | "Unpaid" | "Partially Paid" | "Excused";
+    status: "Paid" | "Unpaid" | "Partially Paid" | "Excused" | "Overdue";
     dateImposed?: FirestoreDate;
     recordedBy?: string;
     imposedBy?: string;
