@@ -31,7 +31,7 @@ export interface BillFines {
     dateImposed?: FirestoreDate;
     roomFineId?: string; // links fines that share the same room fine
     roomNumber?: string; // room number for room fines
-}
+} // i
 
 /** fine payment record */
 export interface PaymentFines {
@@ -46,7 +46,7 @@ export interface PaymentFines {
     finesRemarks: string;
     fineId?: string;
     createdAt: Timestamp;
-    status: "Paid" | "Unpaid" | "Partially Paid";
+    status: "Paid" | "Unpaid" | "Partially Paid" | "Excused";
     dateImposed?: FirestoreDate;
     recordedBy?: string;
     imposedBy?: string;
@@ -54,7 +54,7 @@ export interface PaymentFines {
     roomFineId?: string; // links fines that share the same room fine
     roomNumber?: string; // room number for room fines
 }
-
+// AND JUST FUCKING 
 /** payment fine with recorded by and imposed by as dormer object */
 export interface PaymentFinesData extends Omit<PaymentFines, "recordedBy" | "imposedBy"> {
     notes: boolean;

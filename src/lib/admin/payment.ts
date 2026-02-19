@@ -2,7 +2,6 @@ import {
   collection,
   doc,
   runTransaction,
-  addDoc,
   serverTimestamp,
   getDocs,
 } from "firebase/firestore";
@@ -15,7 +14,7 @@ interface PaymentWithBill extends Payment, Bill {}
 import { getBuiltinModule } from "process";
 import { getBill } from "./bill";
 
-export const recordPayment = async (paymentData: any, user: User) => {
+export const recordPayment = async (paymentData: any, user: User, dormitoryId: string) => {
   await runTransaction(db, async (transaction) => {
     const billRef = doc(db, "bills", paymentData.billId);
     const billDoc = await transaction.get(billRef);
@@ -38,10 +37,14 @@ export const recordPayment = async (paymentData: any, user: User) => {
       newStatus = "Paid";
     }
 
-    await addDoc(collection(db, "payments"), {
+    // Use transaction.set with a new doc ref so the write is part of the transaction
+    const paymentRef = doc(collection(db, "payments"));
+    transaction.set(paymentRef, {
       ...paymentData,
       dormerId: currentBillData.dormerId,
+      dormitoryId: dormitoryId || currentBillData.dormitoryId,
       recordedBy: user.uid,
+      recordedByName: paymentData.recordedByName || user.displayName || user.email || user.uid,
       createdAt: serverTimestamp(),
     });
 

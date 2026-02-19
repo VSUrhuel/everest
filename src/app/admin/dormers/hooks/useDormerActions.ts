@@ -16,10 +16,21 @@ import {
 import { User } from "firebase/auth";
 import { createBill, getBill, updateBill } from "@/lib/admin/bill";
 import { paymentConfirmationEmailTemplate } from "../../payments/utils/email";
+import { billPaymentInvoiceTemplate } from "../email-templates/billPaymentInvoice";
 import { generateRandomPassword } from "../utils/generateRandomPass";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 import { sendEmail } from "@/app/utils/sendEmail";
 import path from "path";
+import {
+  collection,
+  doc,
+  getDocs,
+  query,
+  where,
+  writeBatch,
+  serverTimestamp,
+  addDoc,
+} from "firebase/firestore";
 
 export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,7 +150,14 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
     }
 
     try {
-      await recordPaymentTransaction(paymentData, user, dormitoryId);
+      const recorderDormer =
+        dormers.find((d) => d.id === user.uid) ||
+        dormers.find((d) => d.email === user.email);
+      const recordedByName = recorderDormer
+        ? `${recorderDormer.firstName} ${recorderDormer.lastName}`
+        : user.displayName || user.email || user.uid;
+
+      await recordPaymentTransaction({ ...paymentData, recordedByName }, user, dormitoryId);
 
       toast.success("Payment recorded successfully!");
 
@@ -226,6 +244,9 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
     let successCount = 0;
     let errorCount = 0;
 
+    // Process dormers and collect email tasks
+    const emailTasks: Promise<void>[] = [];
+
     for (const dormerData of dormersList) {
       try {
         const existingDormer = dormers.find(
@@ -247,7 +268,8 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
           dormitoryId,
         );
 
-        await sendEmail({
+        // Queue email sending (don't await yet)
+        const emailTask = sendEmail({
           to: dormerData.email,
           subject: "Welcome to DormPay System",
           html: welcomeUserTemplate(
@@ -261,8 +283,12 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
               path: "DormPay Dormer User Guide v1.2.pdf",
             },
           ],
+        }).catch((error) => {
+          console.error(`Failed to send email to ${dormerData.email}:`, error);
+          // Don't fail the import if email fails
         });
 
+        emailTasks.push(emailTask);
         successCount++;
       } catch (error: any) {
         errorCount++;
@@ -274,10 +300,15 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
       }
     }
 
+    // Send all emails in parallel (don't wait for them to finish)
+    Promise.all(emailTasks).catch((error) => {
+      console.error("Some emails failed to send:", error);
+    });
+
     setIsSubmitting(false);
 
     if (successCount > 0) {
-      toast.success(`Successfully imported ${successCount} dormer(s).`);
+      toast.success(`Successfully imported ${successCount} dormer(s). Welcome emails are being sent.`);
     }
     if (errorCount > 0) {
       toast.error(`Failed to import ${errorCount} dormer(s).`);
@@ -286,9 +317,115 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
     return { successCount, errorCount };
   };
 
+  const payAllBills = async (unpaidBills: Bill[], user: User | null, dormer: Dormer | null) => {
+    if (!user) {
+      toast.error("Authentication error. Please log in again.");
+      return;
+    }
+    if (!unpaidBills.length) {
+      toast.info("No unpaid bills to process.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const batch = writeBatch(db);
+
+      for (const bill of unpaidBills) {
+        if (!bill.id) continue;
+        const billRef = doc(db, "bills", bill.id);
+        const remaining = bill.totalAmountDue - (bill.amountPaid || 0);
+        batch.update(billRef, {
+          amountPaid: bill.totalAmountDue,
+          status: "Paid",
+          updatedBy: user.uid,
+          updatedAt: serverTimestamp(),
+        });
+
+        // Record a payment entry for each bill
+        const paymentData = {
+          billId: bill.id,
+          dormerId: bill.dormerId,
+          dormitoryId: dormitoryId,
+          amount: remaining,
+          paymentMethod: "Pay All",
+          notes: "Bulk payment - Pay All",
+          recordedBy: user.uid,
+          createdAt: serverTimestamp(),
+        };
+        const paymentRef = doc(collection(db, "payments"));
+        batch.set(paymentRef, paymentData);
+      }
+
+      await batch.commit();
+      toast.success("All bills marked as paid successfully!");
+
+      // Send breakdown invoice email
+      if (dormer?.email) {
+        const paymentDate = new Date();
+        const paidBillsData = unpaidBills.map((b) => ({
+          billingPeriod: b.billingPeriod,
+          description: b.description || "",
+          totalAmountDue: b.totalAmountDue,
+          amountPaid: b.totalAmountDue, // fully paid
+          remainingBalance: 0,
+          paymentDate,
+        }));
+
+        // Overall summary from Firestore for accuracy
+        let overallSummary: { totalBills: number; totalAmountDue: number; totalPaid: number; totalRemaining: number } | undefined;
+        try {
+          const billsSnapshot = await getDocs(
+            query(
+              collection(db, "bills"),
+              where("dormerId", "==", dormer.id),
+              where("dormitoryId", "==", dormitoryId)
+            )
+          );
+          if (!billsSnapshot.empty) {
+            const allBills = billsSnapshot.docs.map((d) => d.data());
+            const activeBills = allBills.filter((b) => !b.isDeleted);
+            const totalAmountDue = activeBills.reduce((s, b) => s + (b.totalAmountDue || 0), 0);
+            const totalPaid = activeBills.reduce((s, b) => s + (b.amountPaid || 0), 0);
+            overallSummary = {
+              totalBills: activeBills.length,
+              totalAmountDue,
+              totalPaid,
+              totalRemaining: totalAmountDue - totalPaid,
+            };
+          }
+        } catch (summaryError) {
+          console.error("Error calculating overall bills summary:", summaryError);
+        }
+
+        const recordedByDormer = dormers.find((d) => d.id === user.uid || d.email === user.email);
+        const recordedByName = recordedByDormer
+          ? `${recordedByDormer.firstName} ${recordedByDormer.lastName}`
+          : user.email || "Admin";
+
+        await sendEmail({
+          to: dormer.email,
+          subject: "DormPay System - Bill Payment Invoice",
+          html: billPaymentInvoiceTemplate(
+            `${dormer.firstName} ${dormer.lastName}`,
+            paidBillsData,
+            recordedByName,
+            overallSummary
+          ),
+        });
+      }
+    } catch (error) {
+      console.error("Error paying all bills:", error);
+      toast.error("Failed to mark all bills as paid.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return {
     saveDormer,
     handleSavePayment,
+    payAllBills,
     saveBill,
     deleteDormer,
     isSubmitting,

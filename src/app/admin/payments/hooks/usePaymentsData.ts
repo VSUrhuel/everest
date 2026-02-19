@@ -193,5 +193,7 @@ export function usePaymentsData() {
     totalPages,
     handleNextPage,
     handlePreviousPage,
+    dormers,
+    dormitoryId,
   };
 }
