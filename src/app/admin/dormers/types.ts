@@ -22,7 +22,7 @@ export interface Bill {
   id: string;
   dormerId: string;
   billingPeriod: string;
-  status: "Paid" | "Unpaid" | "Partially Paid" | "Overdue";
+  status: "Paid" | "Unpaid" | "Partially Paid" | "Overdue" | "Excused";
   totalAmountDue: number;
   amountPaid: number;
   description: string; 
