@@ -27,6 +27,7 @@ import {
   Users,
 } from "lucide-react";
 import { EventDormerData } from "../types";
+import { Timestamp } from "firebase/firestore";
 
 interface EventDormersTableProps {
   dormers: EventDormerData[];
@@ -39,7 +40,7 @@ export default function EventDormersTable({
   onLogPayment,
   eventAmount,
 }: EventDormersTableProps) {
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status : string) => {
     const statusConfig = {
       Paid: {
         variant: "default",
@@ -66,13 +67,13 @@ export default function EventDormersTable({
     return statusConfig[status] || statusConfig["Unpaid"];
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount : number) => {
     return `₱${amount.toFixed(2)}`;
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString : Timestamp) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString.toMillis()).toLocaleDateString();
   };
 
   return (
