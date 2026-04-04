@@ -21,8 +21,8 @@ export const generateBillingPeriods = () => {
     label: `2nd Semester (${secondSemLabel})`,
   });
 
-  for (let i = 0; i < 12; i++) {
-    const date = new Date(2025, i + 7, 1);
+  for (let i = 0; i < 6; i++) {
+    const date = new Date(2026, i, 1);
 
     const year = date.getFullYear();
     // Format month for the 'value' (e.g., "2025-08")
