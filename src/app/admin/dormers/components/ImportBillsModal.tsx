@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FileUp, Info, ExternalLink, AlertCircle } from "lucide-react";
 import { generateBillingPeriods } from "@/app/admin/dormers/utils/generateBillUtils";
 import { Payable, ImportedBill } from "../types";
+import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 
 export interface ImportBillsModalProps {
   isOpen: boolean;
@@ -37,6 +38,8 @@ export default function ImportBillsModal({
   const [rowCount, setRowCount] = useState(0);
   const [billCount, setBillCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const {dormitoryName} = useCurrentDormitoryId();
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
@@ -93,7 +96,9 @@ export default function ImportBillsModal({
       return { bills, errors };
     }
 
-    const validPeriods = generateBillingPeriods();
+    const {dormitoryName} = useCurrentDormitoryId();
+
+    const validPeriods = generateBillingPeriods(dormitoryName);
     const validPeriodLabels = validPeriods.map(p => p.label);
     // Create a map from label to value for consistent storage
     const labelToValueMap = new Map(validPeriods.map(p => [p.label, p.value]));
@@ -270,7 +275,7 @@ export default function ImportBillsModal({
               <div className="mt-3 pt-3 border-t border-blue-200">
                 <p className="font-semibold mb-1.5">Valid Billing Periods (Semestral/Monthly):</p>
                 <div className="text-xs space-y-1 max-h-32 overflow-y-auto bg-blue-100 p-2 rounded">
-                  {generateBillingPeriods().map(period => (
+                  {generateBillingPeriods(dormitoryName).map(period => (
                     <div key={period.value} className="font-medium text-blue-800">
                       {period.label}
                     </div>

@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { Dormer, Payable, Bill } from "../types";
 import { generateBillingPeriods } from "../utils/generateBillUtils";
 import { findExistingBill, isPaidBill } from "@/lib/admin/bill";
+import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 
 // --- Type Definitions ---
 interface GenerateBillModalProps {
@@ -69,8 +70,9 @@ export default function GenerateBillModal({
   // Shared state
   const [billingPeriod, setBillingPeriod] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const {dormitoryName} = useCurrentDormitoryId();
 
-  const billingPeriods = useMemo(() => generateBillingPeriods(), []);
+  const billingPeriods = useMemo(() => generateBillingPeriods(dormitoryName), [dormitoryName]);
 
   // Sync single mode total
   useEffect(() => {
