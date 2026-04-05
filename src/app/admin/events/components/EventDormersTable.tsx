@@ -71,7 +71,23 @@ export default function EventDormersTable({
     return `₱${amount.toFixed(2)}`;
   };
 
-  const formatDate = (dateString : Timestamp) => {
+      const formatDate = (dateString: any) => {
+  if (!dateString) return "N/A";
+
+  // 1. Check if it's a real Timestamp object with the method
+  if (typeof dateString.toMillis === 'function') {
+    return new Date(dateString.toMillis()).toLocaleDateString();
+  }
+
+  // 2. Fallback for plain objects (seconds * 1000 + nanoseconds converted to ms)
+  if (dateString.seconds !== undefined) {
+    const ms = dateString.seconds * 1000 + Math.floor(dateString.nanoseconds / 1e6);
+    return new Date(ms).toLocaleDateString();
+  }
+
+  // 3. Fallback for ISO strings or native Date objects
+  return new Date(dateString).toLocaleDateString();
+};
     if (!dateString) return "N/A";
     return new Date(dateString.toMillis()).toLocaleDateString();
   };
