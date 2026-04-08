@@ -86,11 +86,8 @@ export default function EventDormersTable({
   }
 
   // 3. Fallback for ISO strings or native Date objects
-  return new Date(dateString).toLocaleDateString();
+  return new Date(dateString.toMillis()).toLocaleDateString();
 };
-    if (!dateString) return "N/A";
-    return new Date(dateString.toMillis()).toLocaleDateString();
-  };
 
   return (
     <Card className="border-2 border-gray-100 shadow-md bg-white">
