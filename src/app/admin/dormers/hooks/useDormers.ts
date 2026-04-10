@@ -11,6 +11,7 @@ export function useDormers() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [sortFilter, setSortFilter] = useState("Descending");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -72,7 +73,7 @@ export function useDormers() {
   }, [dormers, bills]);
 
   const filteredDormers = useMemo(() => {
-    return dormersWithBills.filter((dormer) => {
+    let filtered = dormersWithBills.filter((dormer) => {
       const matchesSearch = `${dormer.firstName} ${dormer.lastName}`
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
@@ -80,7 +81,14 @@ export function useDormers() {
         statusFilter === "All" || dormer.roomNumber === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [dormersWithBills, searchTerm, statusFilter]);
+
+    if (sortFilter === "Descending") {
+      filtered.sort((a, b) => b.firstName.localeCompare(a.firstName));
+    } else if (sortFilter === "Ascending") {
+      filtered.sort((a, b) => a.firstName.localeCompare(b.firstName));
+    }
+    return filtered;
+  }, [dormersWithBills, searchTerm, statusFilter, sortFilter]);
 
   const paginatedDormers = useMemo(() => {
     const indexOfLastDormer = currentPage * itemsPerPage;
@@ -118,6 +126,8 @@ export function useDormers() {
     setSearchTerm,
     statusFilter,
     setStatusFilter,
+    sortFilter,
+    setSortFilter,
     handleNextPage,
     handlePreviousPage,
   };

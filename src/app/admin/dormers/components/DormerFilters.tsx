@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter, X, ArrowUp, ArrowDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 import { getDormitoryData } from "@/lib/vsu-admin/dashboard";
@@ -23,6 +23,8 @@ interface DormerFiltersProps {
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   statusFilter: string;
   onStatusChange: (value: string) => void;
+  sortFilter: string;
+  onSortChange: (value: string) => void;
   count: number;
   resetFilter: () => void;
 }
@@ -32,6 +34,8 @@ export default function DormerFilters({
   onSearchChange,
   statusFilter,
   onStatusChange,
+  sortFilter,
+  onSortChange,
   count,
   resetFilter,
 }: DormerFiltersProps) {
@@ -84,6 +88,35 @@ export default function DormerFilters({
                       </SelectItem>
                     ))
                   )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex-shrink-0">
+              <Select value={sortFilter} onValueChange={onSortChange}>
+                <SelectTrigger className="border-gray-300 h-9 sm:h-10 w-10 sm:w-auto px-1 py-1 sm:px-3 gap-0 sm:gap-2">
+                  <div className="flex items-center justify-center sm:justify-start w-full">
+                    {sortFilter === "Ascending" ? (
+                      <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    ) : (
+                      <ArrowDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    )}
+                    <span className="hidden sm:inline sm:ml-2">
+                      <SelectValue placeholder="Sort by" />
+                    </span>
+                    {sortFilter !== "All"}
+                  </div>
+                </SelectTrigger>
+                <SelectContent className={undefined}>
+                  <SelectItem value="All" className={undefined}>
+                    All
+                  </SelectItem>
+                  <SelectItem value="Ascending" className={undefined}>
+                    Ascending
+                  </SelectItem>
+                  <SelectItem value="Descending" className={undefined}>
+                    Descending
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -40,6 +40,8 @@ export default function EventDetailsContent() {
     setSearchTerm,
     statusFilter,
     setStatusFilter,
+    sortFilter,
+    setSortFilter,
     handleNextPage,
     handlePreviousPage,
     dormers,
@@ -308,10 +310,13 @@ export default function EventDetailsContent() {
         onSearchChange={(e) => setSearchTerm(e.target.value)}
         statusFilter={statusFilter}
         onStatusChange={setStatusFilter}
+        sortFilter={sortFilter}
+        onSortChange={setSortFilter}
         count={paginatedDormers.length}
         resetFilter={() => {
           setSearchTerm("");
           setStatusFilter("All");
+          setSortFilter("Descending");
         }}
       />
 
