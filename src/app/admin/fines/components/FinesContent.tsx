@@ -31,6 +31,8 @@ interface FinesContentProps {
   setSearchTerm: (term: string) => void;
   statusFilter: string;
   setStatusFilter: (filter: string) => void;
+  sortFilter: string;
+  setSortFilter: (filter: string) => void;
   handleNextPage: () => void;
   handlePreviousPage: () => void;
   dormers: any[];
@@ -61,6 +63,8 @@ export default function FinesContent({
   setSearchTerm,
   statusFilter,
   setStatusFilter,
+  sortFilter,
+  setSortFilter,
   handleNextPage,
   handlePreviousPage,
   dormers,
@@ -182,10 +186,13 @@ export default function FinesContent({
         onSearchChange={(e) => setSearchTerm(e.target.value)}
         statusFilter={statusFilter}
         onStatusChange={setStatusFilter}
+        sortFilter={sortFilter}
+        onSortChange={setSortFilter}
         count={paginatedDormers.length}
         resetFilter={() => {
           setSearchTerm("");
           setStatusFilter("All");
+          setSortFilter("Descending");
         }}
       />
 

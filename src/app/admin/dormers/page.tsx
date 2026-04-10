@@ -55,6 +55,8 @@ export default function DormersPage() {
     setSearchTerm,
     statusFilter,
     setStatusFilter,
+    sortFilter,
+    setSortFilter,
     handleNextPage,
     handlePreviousPage,
   } = useDormers();
@@ -399,10 +401,13 @@ export default function DormersPage() {
         onSearchChange={(e) => setSearchTerm(e.target.value)}
         statusFilter={statusFilter}
         onStatusChange={setStatusFilter}
+        sortFilter={sortFilter}
+        onSortChange={setSortFilter}
         count={paginatedDormers.length}
         resetFilter={() => {
           setSearchTerm("");
           setStatusFilter("All");
+          setSortFilter("Descending");
         }}
       />
 

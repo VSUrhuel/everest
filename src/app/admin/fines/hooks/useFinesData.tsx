@@ -17,6 +17,7 @@ export const useFinesData = () =>{
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
+    const [sortFilter, setSortFilter] = useState("Descending");
     const [dormers, setDormers] = useState<Dormer[]>([]);
 
     const itemsPerPage = 10;
@@ -135,7 +136,7 @@ export const useFinesData = () =>{
     }, [dormers, fines]);
 
     const filteredDormers = useMemo(() => {
-        return dormersWithFines.filter((dormer) => {
+        let filtered = dormersWithFines.filter((dormer) => {
             const matchesSearch = `${dormer.firstName} ${dormer.lastName}`
                 .toLowerCase()
                 .includes(searchTerm.toLowerCase());
@@ -143,7 +144,14 @@ export const useFinesData = () =>{
                 statusFilter === "All" || dormer.roomNumber === statusFilter;
             return matchesSearch && matchesStatus;
         });
-    }, [dormersWithFines, searchTerm, statusFilter]);
+
+        if (sortFilter === "Descending") {
+            filtered.sort((a, b) => b.firstName.localeCompare(a.firstName));
+        } else if (sortFilter === "Ascending") {
+            filtered.sort((a, b) => a.firstName.localeCompare(b.firstName));
+        }
+        return filtered;
+    }, [dormersWithFines, searchTerm, statusFilter, sortFilter]);
 
     const paginatedDormers = useMemo(() => {
         const indexOfLastDormer = currentPage * itemsPerPage;
@@ -170,5 +178,5 @@ export const useFinesData = () =>{
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, statusFilter]);
-    return { fines, payableFines, loading, error, summary, paginatedDormers, totalPages, currentPage, searchTerm, setSearchTerm, statusFilter, setStatusFilter, handleNextPage, handlePreviousPage, dormers, dormersWithFines };
+    return { fines, payableFines, loading, error, summary, paginatedDormers, totalPages, currentPage, searchTerm, setSearchTerm, statusFilter, setStatusFilter, sortFilter, setSortFilter, handleNextPage, handlePreviousPage, dormers, dormersWithFines };
 }

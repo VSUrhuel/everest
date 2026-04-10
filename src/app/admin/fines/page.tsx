@@ -26,6 +26,8 @@ export default function FinesPage() {
     setSearchTerm,
     statusFilter,
     setStatusFilter,
+    sortFilter,
+    setSortFilter,
     handleNextPage,
     handlePreviousPage,
     dormers,
@@ -309,6 +311,8 @@ export default function FinesPage() {
         setSearchTerm={setSearchTerm}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
+        sortFilter={sortFilter}
+        setSortFilter={setSortFilter}
         handleNextPage={handleNextPage}
         handlePreviousPage={handlePreviousPage}
         dormers={dormers}
