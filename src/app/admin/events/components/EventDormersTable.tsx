@@ -85,8 +85,9 @@ export default function EventDormersTable({
     return new Date(ms).toLocaleDateString();
   }
 
-  // 3. Fallback for ISO strings or native Date objects
-  return new Date(dateString.toMillis()).toLocaleDateString();
+  // 3. Fallback for ISO strings, numbers, or native Date objects
+  const parsed = new Date(dateString);
+  return isNaN(parsed.getTime()) ? "N/A" : parsed.toLocaleDateString();
 };
 
   return (
