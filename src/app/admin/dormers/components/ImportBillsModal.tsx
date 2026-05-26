@@ -17,6 +17,8 @@ import { FileUp, Info, ExternalLink, AlertCircle } from "lucide-react";
 import { generateBillingPeriods } from "@/app/admin/dormers/utils/generateBillUtils";
 import { Payable, ImportedBill } from "../types";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
+import { parseCsvRows, sanitizeCell, readCsvFile } from "@/lib/csv/parseCsv";
+import { canonicaliseBillingPeriod } from "../utils/billingPeriodCanonical";
 
 export interface ImportBillsModalProps {
   isOpen: boolean;
@@ -70,15 +72,17 @@ export default function ImportBillsModal({
       return { bills: [], errors };
     }
 
-    const lines = text.trim().split("\n");
-    if (lines.length < 2) {
+    const { rows, errors: parseErrors } = parseCsvRows(text);
+    errors.push(...parseErrors);
+
+    if (rows.length < 2) {
       errors.push("Invalid CSV format: File must contain at least a header row and one data row.");
       return { bills: [], errors };
     }
 
     const bills: ImportedBill[] = [];
 
-    const headers = lines[0].split(",").map((h) => h.trim());
+    const headers = rows[0].map((h) => (h ?? "").trim());
     if (headers.length < 4) {
       errors.push("Invalid CSV format: Must have at least 4 columns (Email, First Name, Last Name, and billing period columns).");
       return { bills, errors };
@@ -96,41 +100,52 @@ export default function ImportBillsModal({
       return { bills, errors };
     }
 
-    const {dormitoryName} = useCurrentDormitoryId();
-
     const validPeriods = generateBillingPeriods(dormitoryName);
-    const validPeriodLabels = validPeriods.map(p => p.label);
-    // Create a map from label to value for consistent storage
     const labelToValueMap = new Map(validPeriods.map(p => [p.label, p.value]));
+    // Canonical alias map: e.g. "2025-08" → value for "August 2025".
+    // This lets the CSV header use any of "August 2025", "Aug 2025", "Aug-25",
+    // "Aug-2025", or "2025-08" and still resolve to the same period.
+    const canonicalToValueMap = new Map<string, string>();
+    for (const p of validPeriods) {
+      const key = canonicaliseBillingPeriod(p.label);
+      if (key) canonicalToValueMap.set(key, p.value);
+    }
+
+    const resolvePeriod = (header: string): string | undefined => {
+      const exact = labelToValueMap.get(header);
+      if (exact) return exact;
+      const canonical = canonicaliseBillingPeriod(header);
+      if (canonical) return canonicalToValueMap.get(canonical);
+      return undefined;
+    };
 
     for (let j = 0; j < billingPeriods.length; j++) {
-      const period = billingPeriods[j].trim();
+      const period = billingPeriods[j];
       if (!period) {
         errors.push(`Column ${j + 4}: Billing period header is empty.`);
-      } else if (!validPeriodLabels.includes(period)) {
+      } else if (!resolvePeriod(period)) {
         errors.push(`Column ${j + 4}: Invalid billing period "${period}". Must match one of the system-defined billing periods.`);
       }
     }
 
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = 1; i < rows.length; i++) {
       const rowNumber = i + 1;
-      const parts = lines[i].split(",").map((p) => p.trim());
+      const parts = rows[i].map((p) => (p ?? "").trim());
 
       if (parts.length < 4) {
         errors.push(`Row ${rowNumber}: Insufficient columns. Expected at least 4 columns, found ${parts.length}.`);
         continue;
       }
 
-      const email = parts[0];
-      const firstName = parts[1];
-      const lastName = parts[2];
+      const email = sanitizeCell(parts[0]);
+      const firstName = sanitizeCell(parts[1]);
+      const lastName = sanitizeCell(parts[2]);
 
       if (!email || !firstName || !lastName) {
         errors.push(`Row ${rowNumber}: Missing required fields. Email, First Name, and Last Name are required.`);
         continue;
       }
 
-      // basic email validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         errors.push(`Row ${rowNumber}: Invalid email format "${email}".`);
@@ -139,29 +154,27 @@ export default function ImportBillsModal({
 
       // Process billing periods - create bills for non-empty cells
       for (let j = 3; j < parts.length && j < headers.length; j++) {
-        const value = parts[j]?.trim();
-        // Non-empty cell indicates billing for that period
+        const value = parts[j];
         if (value && value !== "") {
           const billingPeriodLabel = headers[j];
 
-          if (!billingPeriodLabel || !billingPeriodLabel.trim()) {
+          if (!billingPeriodLabel) {
             errors.push(`Row ${rowNumber}: Invalid billing period "${billingPeriodLabel}".`);
             continue;
           }
 
-          // Map the label to its consistent value for storage
-          const billingPeriodValue = labelToValueMap.get(billingPeriodLabel);
+          const billingPeriodValue = resolvePeriod(billingPeriodLabel);
           if (!billingPeriodValue) {
             errors.push(`Row ${rowNumber}: Could not map billing period "${billingPeriodLabel}" to a valid value.`);
             continue;
           }
 
           bills.push({
-            email: email,
-            firstName: firstName,
-            lastName: lastName,
-            billingPeriod: billingPeriodValue, // Use the consistent value, not the label
-            rowNumber: rowNumber,
+            email,
+            firstName,
+            lastName,
+            billingPeriod: billingPeriodValue,
+            rowNumber,
           });
         }
       }
@@ -198,18 +211,17 @@ export default function ImportBillsModal({
     handleClose();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
+    try {
+      const text = await readCsvFile(file);
       setCsvText(text);
       const lines = text.trim().split("\n").filter(line => line.trim());
       const dataRows = lines.length > 0 && lines[0].toLowerCase().includes('email') ? lines.length - 1 : lines.length;
       setRowCount(dataRows);
-      
+
       // Estimate bill count
       let estimatedBills = 0;
       lines.forEach((line, idx) => {
@@ -220,8 +232,9 @@ export default function ImportBillsModal({
         }
       });
       setBillCount(estimatedBills);
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      toast.error("Could not read the CSV file.");
+    }
   };
 
   const handleClose = () => {
