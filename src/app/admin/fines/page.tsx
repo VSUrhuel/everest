@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import ImportResultModal from "./components/ImportResultModal";
 import { sendEmail } from "@/app/utils/sendEmail";
 import { newFineImposedTemplate } from "./email-templates/newFineImposed";
+import { roomFineImposedTemplate } from "./email-templates/roomFineImposed";
 import { ProgressModal } from "@/components/ui/progress-modal";
 
 export default function FinesPage() {
@@ -378,11 +379,17 @@ export default function FinesPage() {
 
   const handleApplyRoomFine = async (roomNumber: string, amount: number, reason: string) => {
     try {
-      // Get all dormers in the specified room
-      const dormersInRoom = dormers.filter(d => d.roomNumber === roomNumber);
-      
+      // Get all dormers in the specified room (exclude soft-deleted)
+      const isSoftDeleted = (d: any) => {
+        const raw = d.isDeleted;
+        return raw === true || raw === "true" || raw === 1 || Boolean(d.deletedAt);
+      };
+      const dormersInRoom = dormers.filter(
+        (d) => d.roomNumber === roomNumber && !isSoftDeleted(d),
+      );
+
       if (dormersInRoom.length === 0) {
-        toast.error(`No dormers found in Room ${roomNumber}`);
+        toast.error(`No active dormers found in Room ${roomNumber}`);
         return;
       }
 
@@ -390,9 +397,11 @@ export default function FinesPage() {
 
       // generate a unique ID for this room fine to link all individual fines
       const roomFineId = `room_${roomNumber}_${Date.now()}`;
-      
+      const dateImposed = new Date();
+
       let successCount = 0;
       let errorCount = 0;
+      const savedDormers: typeof dormersInRoom = [];
 
       for (const dormer of dormersInRoom) {
         try {
@@ -401,12 +410,13 @@ export default function FinesPage() {
             finesRemarks: `Room ${roomNumber}: ${reason}`,
             dormerId: dormer.id,
             dormitoryId: dormer.dormitoryId,
-            dateImposed: new Date(),
+            dateImposed,
             roomFineId, // Link all fines with this shared ID
             roomNumber,
           };
 
           await saveFine(fineData, user);
+          savedDormers.push(dormer);
           successCount++;
         } catch (error) {
           console.error(`Error applying fine to ${dormer.firstName} ${dormer.lastName}:`, error);
@@ -416,10 +426,42 @@ export default function FinesPage() {
 
       toast.dismiss();
 
-      if (errorCount === 0) {
-        toast.success(`Successfully applied shared ₱${amount.toFixed(2)} room fine to all ${successCount} residents in Room ${roomNumber}`);
+      // BCC blast: one shared email to every resident whose fine was successfully saved
+      let emailsSent = 0;
+      let emailsFailed = 0;
+      const recipientEmails = savedDormers.map((d) => d.email).filter(Boolean);
+      const uniqueRecipients = Array.from(new Set(recipientEmails));
+      if (uniqueRecipients.length > 0) {
+        const result = await sendEmail(
+          {
+            to: uniqueRecipients.join(", "),
+            subject: `Shared Room Fine for Room ${roomNumber}`,
+            html: roomFineImposedTemplate(
+              roomNumber,
+              amount,
+              reason,
+              dateImposed,
+              savedDormers.length,
+            ),
+          },
+          { silent: true },
+        );
+        if (result.ok) emailsSent = uniqueRecipients.length;
+        else emailsFailed = uniqueRecipients.length;
+      }
+
+      if (errorCount === 0 && emailsFailed === 0) {
+        toast.success(
+          `Successfully applied shared ₱${amount.toFixed(2)} room fine to all ${successCount} residents in Room ${roomNumber}${emailsSent > 0 ? ` — notified ${emailsSent} resident(s) by email.` : "."}`,
+        );
+      } else if (errorCount === 0 && emailsFailed > 0) {
+        toast.warning(
+          `Fine applied to ${successCount} residents but the notification email failed to send.`,
+        );
       } else {
-        toast.warning(`Applied fine to ${successCount} residents. ${errorCount} failed.`);
+        toast.warning(
+          `Applied fine to ${successCount} residents. ${errorCount} failed.${emailsSent > 0 ? ` ${emailsSent} email(s) sent.` : ""}`,
+        );
       }
     } catch (error) {
       toast.dismiss();
