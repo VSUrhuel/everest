@@ -174,28 +174,28 @@ export function useEventActions(
       const unpaid = eligible.filter((e) => e.status === "Unpaid");
       const partial = eligible.filter((e) => e.status === "Partial");
 
-      console.log("[remindPayable] Recipient audit:", {
-        eventId: event.id,
-        eventName: event.name,
-        amountDue: event.amountDue,
-        totalDormers: dormers.length,
-        skippedDeleted: perDormerAudit.filter((a) => a.decision === "skip-deleted").length,
-        skippedNoEmail: perDormerAudit.filter((a) => a.decision === "skip-no-email").length,
-        skippedAlreadyPaid: perDormerAudit.filter((a) => a.decision === "skip-paid").length,
-        unpaidCount: unpaid.length,
-        partialCount: partial.length,
-        unpaidRecipients: unpaid.map((r) => ({
-          dormerId: r.dormer.id,
-          email: r.dormer.email,
-        })),
-        partialRecipients: partial.map((r) => ({
-          dormerId: r.dormer.id,
-          email: r.dormer.email,
-          amountPaid: r.amountPaid,
-          remainingBalance: r.remainingBalance,
-        })),
-        perDormer: perDormerAudit,
-      });
+      // console.log("[remindPayable] Recipient audit:", {
+      //   eventId: event.id,
+      //   eventName: event.name,
+      //   amountDue: event.amountDue,
+      //   totalDormers: dormers.length,
+      //   skippedDeleted: perDormerAudit.filter((a) => a.decision === "skip-deleted").length,
+      //   skippedNoEmail: perDormerAudit.filter((a) => a.decision === "skip-no-email").length,
+      //   skippedAlreadyPaid: perDormerAudit.filter((a) => a.decision === "skip-paid").length,
+      //   unpaidCount: unpaid.length,
+      //   partialCount: partial.length,
+      //   unpaidRecipients: unpaid.map((r) => ({
+      //     dormerId: r.dormer.id,
+      //     email: r.dormer.email,
+      //   })),
+      //   partialRecipients: partial.map((r) => ({
+      //     dormerId: r.dormer.id,
+      //     email: r.dormer.email,
+      //     amountPaid: r.amountPaid,
+      //     remainingBalance: r.remainingBalance,
+      //   })),
+      //   perDormer: perDormerAudit,
+      // });
 
       if (eligible.length === 0) {
         toast.info("All dormers have paid for this event.");
