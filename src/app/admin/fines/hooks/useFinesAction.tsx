@@ -176,14 +176,14 @@ export const useFinesActions = () => {
             await addDoc(collection(db, "finesPaymentHistory"), historyData);
             
             // Send payment invoice email to dormer
-            console.log('=== EMAIL CHECK ===');
-            console.log('Dormer email:', dormer?.email);
-            console.log('Fines remarks:', paymentData.finesRemarks);
-            console.log('Total amount due:', paymentData.totalAmountDue);
-            console.log('Payment data:', paymentData);
+            // console.log('=== EMAIL CHECK ===');
+            // console.log('Dormer email:', dormer?.email);
+            // console.log('Fines remarks:', paymentData.finesRemarks);
+            // console.log('Total amount due:', paymentData.totalAmountDue);
+            // console.log('Payment data:', paymentData);
             
             if (dormer?.email && paymentData.finesRemarks && paymentData.totalAmountDue !== undefined) {
-                console.log('Sending payment invoice email to:', dormer.email);
+                //console.log('Sending payment invoice email to:', dormer.email);
                 const recordedByName = recordedByDormer 
                     ? `${recordedByDormer.firstName} ${recordedByDormer.lastName}` 
                     : user?.email || "Administration";
@@ -253,14 +253,14 @@ export const useFinesActions = () => {
                         },
                         { silent: true },
                     );
-                    console.log('Email sent successfully');
+                    //console.log('Email sent successfully');
                     toast.success("Payment recorded and invoice sent successfully");
                 } catch (emailError) {
-                    console.error('Email sending failed:', emailError);
+                    //console.error('Email sending failed:', emailError);
                     toast.success("Payment recorded (email notification failed)");
                 }
             } else {
-                console.log('Email not sent - missing required data');
+                //console.log('Email not sent - missing required data');
                 toast.success("Payment recorded successfully");
             }
             

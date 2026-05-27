@@ -165,7 +165,7 @@ export default function FinesPage() {
           return;
         }
 
-        console.log('Looking for dormer with email:', email, 'firstName:', firstName, 'lastName:', lastName);
+        //console.log('Looking for dormer with email:', email, 'firstName:', firstName, 'lastName:', lastName);
         const dormer = dormers.find(d =>
           d.email.trim().toLowerCase() === email.toLowerCase() &&
           d.firstName.trim().toLowerCase() === firstName.toLowerCase() &&
@@ -173,7 +173,7 @@ export default function FinesPage() {
         );
 
         if (dormer) {
-          console.log('Found dormer:', dormer.id);
+          //console.log('Found dormer:', dormer.id);
           // add all fines for this valid student
           studentFines.forEach(fine => {
             mappedFines.push({

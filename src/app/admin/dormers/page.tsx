@@ -421,7 +421,7 @@ export default function DormersPage() {
       const newBills: MappedBill[] = [];
       const duplicates: { bill: MappedBill; existingId: string }[] = [];
 
-      console.log('[BulkImport] Checking bills for duplicates. Total mapped bills:', mappedBills.length);
+      //console.log('[BulkImport] Checking bills for duplicates. Total mapped bills:', mappedBills.length);
       setImportProgress({ title: "Checking for duplicates", message: "Looking up existing bills…", progress: 0, total: mappedBills.length });
 
       // Check each bill for duplicates using the centralized helper function
@@ -436,7 +436,7 @@ export default function DormersPage() {
         );
 
         if (isPaid) {
-          console.log(`[BulkImport] Row ${bill.rowNumber}: Bill already paid for ${bill.firstName} ${bill.lastName}, skipping`);
+          //console.log(`[BulkImport] Row ${bill.rowNumber}: Bill already paid for ${bill.firstName} ${bill.lastName}, skipping`);
           errors.push(`Row ${bill.rowNumber}: Bill for ${bill.firstName} ${bill.lastName} is already paid or partially paid and cannot be overwritten.`);
           errorCount++;
           checkedCount++;
@@ -452,17 +452,17 @@ export default function DormersPage() {
         );
 
         if (existingBillId) {
-          console.log(`[BulkImport] Row ${bill.rowNumber}: Found duplicate unpaid bill ${existingBillId} for ${bill.firstName} ${bill.lastName}`);
+          //console.log(`[BulkImport] Row ${bill.rowNumber}: Found duplicate unpaid bill ${existingBillId} for ${bill.firstName} ${bill.lastName}`);
           duplicates.push({ bill, existingId: existingBillId });
         } else {
-          console.log(`[BulkImport] Row ${bill.rowNumber}: No duplicate found, will create new bill`);
+          //console.log(`[BulkImport] Row ${bill.rowNumber}: No duplicate found, will create new bill`);
           newBills.push(bill);
         }
         checkedCount++;
         setImportProgress((p) => (p ? { ...p, progress: checkedCount } : p));
       }
 
-      console.log('[BulkImport] Summary:', { newBills: newBills.length, duplicates: duplicates.length, skippedPaid: errorCount });
+      //console.log('[BulkImport] Summary:', { newBills: newBills.length, duplicates: duplicates.length, skippedPaid: errorCount });
 
       if (duplicates.length > 0) {
         setImportProgress(null);
