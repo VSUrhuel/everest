@@ -26,7 +26,7 @@ async function authorize(request) {
     const snap = await adminDb.collection("dormers").doc(decoded.uid).get();
     const role = snap.exists ? snap.data()?.role : null;
     if (!role || !ALLOWED_ROLES.has(role)) {
-      return { ok: false, status: 403, message: "Forbidden: admin role required" };
+      return { ok: false, status: 403, message: "Forbidden: insufficient privileges" };
     }
   } catch (err) {
     return { ok: false, status: 500, message: "Role lookup failed" };
@@ -54,7 +54,22 @@ export async function POST(request) {
         }
 
         if (att.path) {
-          const fullPath = path.join(process.cwd(), "public", att.path);
+          if (typeof att.path !== "string" || path.isAbsolute(att.path)) {
+            return NextResponse.json(
+              { message: "Invalid attachment path", error: "Attachment path must be a relative path" },
+              { status: 400 }
+            );
+          }
+
+          const publicDir = path.resolve(process.cwd(), "public");
+          const fullPath = path.resolve(publicDir, att.path);
+          const relative = path.relative(publicDir, fullPath);
+          if (relative.startsWith("..") || path.isAbsolute(relative)) {
+            return NextResponse.json(
+              { message: "Invalid attachment path", error: "Attachment path escapes the public directory" },
+              { status: 400 }
+            );
+          }
 
           if (!fs.existsSync(fullPath)) {
             console.error("Attachment file not found:", fullPath);
