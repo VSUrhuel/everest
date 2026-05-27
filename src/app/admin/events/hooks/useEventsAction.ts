@@ -38,8 +38,15 @@ export function useEventActions() {
         await addEvent(dataToSave, user.uid, dormitoryId);
         toast.success("New event created successfully!");
       }
-
-      const recipientEmails = dormers.map((d) => d.email).filter(Boolean);
+      // Ensure deleted dormers don't receive emails by checking multiple possible indicators of deletion
+      const recipientEmails = dormers
+        .filter((d) => {
+          const raw = (d as any).isDeleted;
+          const deleted = raw === true || raw === "true" || raw === 1 || Boolean((d as any).deletedAt);
+          return !deleted;
+        })
+        .map((d) => d.email)
+        .filter(Boolean);
       if (recipientEmails.length > 0) {
         await sendEmail({
           to: recipientEmails.join(", "),
