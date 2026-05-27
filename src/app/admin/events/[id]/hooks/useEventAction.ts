@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Event, EventPayment } from "../../types";
 import { Dormer } from "../../../dormers/types";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
+import { sendEmail } from "@/app/utils/sendEmail";
 
 export function useEventActions(
   event: Event | null,
@@ -26,20 +27,6 @@ export function useEventActions(
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const {dormitoryId, loading} = useCurrentDormitoryId();
-
-  const sendEmail = async (emailData: any) => {
-    try {
-      const response = await fetch("/api/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(emailData),
-      });
-      if (!response.ok) throw new Error("Failed to send email");
-    } catch (error) {
-      console.error("Error sending email:", error);
-      toast.error("Failed to send notification email.");
-    }
-  };
 
   const handlePaymentSubmit = async (paymentData: any, user: User | null) => {
     if (!event || !user) {

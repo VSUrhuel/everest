@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { ExpenseData } from "../types";
 import { Dormer } from "../../dormers/types";
+import { sendEmail } from "@/app/utils/sendEmail";
 
 // Note: We need a way to convert data to CSV here as well for the attachment.
 // We'll define a local version or import from csvUtils if structure allows.
@@ -38,20 +39,6 @@ const convertToCSV = (data: ExpenseData[]): string => {
   return [header.join(","), ...rows].join("\n");
 };
 
-const sendEmail = async (emailData: {
-  to: string;
-  subject: string;
-  html: string;
-  attachments?: any[];
-}) => {
-  const response = await fetch("/api/send-email", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(emailData),
-  });
-  if (!response.ok) throw new Error("Failed to send email");
-};
-
 export const handleSendExpenseReport = async (
   filteredExpenses: ExpenseData[],
   dormers: Dormer[],
@@ -87,22 +74,30 @@ export const handleSendExpenseReport = async (
             </div>
         `;
 
-    await sendEmail({
-      to: recipientEmails.join(", "),
-      subject: "Dormitory Expense Report",
-      html: emailHtml,
-      attachments: [
-        {
-          filename: `expenses-report-${
-            new Date().toISOString().split("T")[0]
-          }.csv`,
-          content: csvData,
-          contentType: "text/csv",
-        },
-      ],
-    });
+    const result = await sendEmail(
+      {
+        to: recipientEmails.join(", "),
+        subject: "Dormitory Expense Report",
+        html: emailHtml,
+        attachments: [
+          {
+            filename: `expenses-report-${
+              new Date().toISOString().split("T")[0]
+            }.csv`,
+            content: csvData,
+            contentType: "text/csv",
+          },
+        ],
+      },
+      { silent: true },
+    );
 
-    toast.success("Expense report has been emailed to all dormers!");
+    if (!result.ok) {
+      console.error("Failed to email report:", result.error);
+      toast.error("There was a problem sending the email report.");
+    } else {
+      toast.success("Expense report has been emailed to all dormers!");
+    }
   } catch (error) {
     console.error("Failed to email report:", error);
     toast.error("There was a problem sending the email report.");

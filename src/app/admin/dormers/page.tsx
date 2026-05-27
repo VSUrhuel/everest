@@ -244,32 +244,45 @@ export default function DormersPage() {
   }
 
   async function fanOutBillEmails(ops: CommitOp[], payable: Payable): Promise<{ emailsSent: number; emailsFailed: number }> {
+    const EMAIL_CONCURRENCY = 5;
     let emailsSent = 0;
     let emailsFailed = 0;
     setImportProgress({ title: "Sending notifications", message: "Emailing dormers…", progress: 0, total: ops.length });
     let done = 0;
-    const tasks = ops.map(async (op) => {
-      let result: { ok: boolean; error?: string };
-      const dormer = dormers.find((d) => d.id === op.dormerId);
-      if (!dormer?.email) {
-        result = { ok: false, error: "no dormer email" };
-      } else {
-        const periodLabel = getBillingPeriodLabel(op.billingPeriod);
-        result = await sendEmail({
-          to: dormer.email,
-          subject: `New ${payable.name} Bill for ${periodLabel}`,
-          html: newBillTemplate(dormer.firstName, payable.name, periodLabel, payable.amount),
-        });
+    let nextIndex = 0;
+    const worker = async () => {
+      while (true) {
+        const i = nextIndex++;
+        if (i >= ops.length) break;
+        const op = ops[i];
+        try {
+          const dormer = dormers.find((d) => d.id === op.dormerId);
+          let result: { ok: boolean; error?: string };
+          if (!dormer?.email) {
+            result = { ok: false, error: "no dormer email" };
+          } else {
+            const periodLabel = getBillingPeriodLabel(op.billingPeriod);
+            result = await sendEmail(
+              {
+                to: dormer.email,
+                subject: `New ${payable.name} Bill for ${periodLabel}`,
+                html: newBillTemplate(dormer.firstName, payable.name, periodLabel, payable.amount),
+              },
+              { silent: true },
+            );
+          }
+          if (result.ok) emailsSent++;
+          else emailsFailed++;
+        } catch {
+          emailsFailed++;
+        } finally {
+          done++;
+          setImportProgress((p) => (p ? { ...p, progress: done } : p));
+        }
       }
-      done++;
-      setImportProgress((p) => (p ? { ...p, progress: done } : p));
-      return result;
-    });
-    const results = await Promise.allSettled(tasks);
-    for (const r of results) {
-      if (r.status === "fulfilled" && (r.value as any)?.ok) emailsSent++;
-      else emailsFailed++;
-    }
+    };
+    const workerCount = Math.min(EMAIL_CONCURRENCY, ops.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
     return { emailsSent, emailsFailed };
   }
 

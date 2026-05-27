@@ -111,7 +111,7 @@ export default function ImportAttendanceModal({
         continue;
       }
 
-      const email = sanitizeCell(parts[0]);
+      const email = parts[0];
       const firstName = sanitizeCell(parts[1]);
       const lastName = sanitizeCell(parts[2]);
 

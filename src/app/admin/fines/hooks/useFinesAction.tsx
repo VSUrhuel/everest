@@ -8,38 +8,13 @@ import { firestore as db } from "@/lib/firebase";
 import { User } from "firebase/auth";
 import { paymentInvoiceTemplate } from "../email-templates/paymentInvoice";
 import { Dormer } from "../../dormers/types";
+import { sendEmail } from "@/app/utils/sendEmail";
 
 export const useFinesActions = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<Error | null>(null);
-    
+
     const { dormitoryId } = useCurrentDormitoryId();
-    
-    const sendEmail = async (emailData: {
-        to: string;
-        subject: string;
-        html: string;
-    }) => {
-        try {
-            const response = await fetch("/api/send-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(emailData),
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error("Email API error response:", errorText);
-                throw new Error(`Failed to send email: ${response.status} - ${errorText}`);
-            }
-            
-            const result = await response.json();
-            console.log("Email sent successfully:", result);
-        } catch (error) {
-            console.error("Email sending error:", error);
-            // don't throw - just log the error so payment still succeeds
-        }
-    };
     
     const addFine = async (fine: Fine) => {
         if (!dormitoryId) {
@@ -270,11 +245,14 @@ export const useFinesActions = () => {
                         overallSummary
                     );
                     
-                    await sendEmail({
-                        to: dormer.email,
-                        subject: "DormPay System - Fine Payment Invoice",
-                        html: emailHtml,
-                    });
+                    await sendEmail(
+                        {
+                            to: dormer.email,
+                            subject: "DormPay System - Fine Payment Invoice",
+                            html: emailHtml,
+                        },
+                        { silent: true },
+                    );
                     console.log('Email sent successfully');
                     toast.success("Payment recorded and invoice sent successfully");
                 } catch (emailError) {
@@ -299,7 +277,7 @@ export const useFinesActions = () => {
         try {
             setIsSubmitting(true);
             const batch = writeBatch(db);
-            const emailPromises: Promise<void>[] = [];
+            const emailPromises: Promise<unknown>[] = [];
             
             // Group fines by dormer for email sending
             const finesByDormer = new Map<string, PaymentFines[]>();
@@ -420,11 +398,14 @@ export const useFinesActions = () => {
                         );
                         
                         emailPromises.push(
-                            sendEmail({
-                                to: dormer.email,
-                                subject: "DormPay System - Fine Payment Invoice",
-                                html: emailHtml,
-                            })
+                            sendEmail(
+                                {
+                                    to: dormer.email,
+                                    subject: "DormPay System - Fine Payment Invoice",
+                                    html: emailHtml,
+                                },
+                                { silent: true },
+                            )
                         );
                     }
                 }

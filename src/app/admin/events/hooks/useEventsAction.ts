@@ -8,24 +8,11 @@ import { Dormer } from "../../dormers/types";
 import { addEvent, updateEvent } from "@/lib/admin/event";
 import { newEventEmailTemplate } from "../utils/email";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
+import { sendEmail } from "@/app/utils/sendEmail";
 
 export function useEventActions() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const {dormitoryId, loading} = useCurrentDormitoryId();
-
-  const sendEmail = async (emailData: any) => {
-    try {
-      const response = await fetch("/api/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(emailData),
-      });
-      if (!response.ok) throw new Error("Failed to send email");
-    } catch (error) {
-      console.error("Error sending email:", error);
-      toast.error("Failed to send notification email.");
-    }
-  };
 
   const handleSaveEvent = async (
     eventData: Omit<Event, "id" | "createdAt">,

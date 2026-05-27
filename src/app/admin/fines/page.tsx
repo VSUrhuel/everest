@@ -321,36 +321,48 @@ export default function FinesPage() {
 
       const dormerEntries = Array.from(byDormer.entries());
       setImportProgress({ title: "Sending notifications", message: "Emailing dormers…", progress: 0, total: dormerEntries.length });
+      const EMAIL_CONCURRENCY = 5;
       let emailsDone = 0;
-      const emailResults = await Promise.allSettled(
-        dormerEntries.map(async ([dormerId, group]) => {
-          let result: { ok: boolean; error?: string };
-          const dormer = dormers.find((d) => d.id === dormerId);
-          if (!dormer?.email) {
-            result = { ok: false, error: "no dormer email" };
-          } else {
-            result = await sendEmail({
-              to: dormer.email,
-              subject: `New Fine${group.length > 1 ? "s" : ""} Imposed`,
-              html: newFineImposedTemplate(
-                dormer.firstName,
-                group.map((g) => ({
-                  finesRemarks: g.meta.reason,
-                  totalAmountDue: g.meta.amount,
-                  dateImposed: g.meta.dateImposed,
-                })),
-              ),
-            });
+      let nextIndex = 0;
+      const worker = async () => {
+        while (true) {
+          const i = nextIndex++;
+          if (i >= dormerEntries.length) break;
+          const [dormerId, group] = dormerEntries[i];
+          try {
+            const dormer = dormers.find((d) => d.id === dormerId);
+            let result: { ok: boolean; error?: string };
+            if (!dormer?.email) {
+              result = { ok: false, error: "no dormer email" };
+            } else {
+              result = await sendEmail(
+                {
+                  to: dormer.email,
+                  subject: `New Fine${group.length > 1 ? "s" : ""} Imposed`,
+                  html: newFineImposedTemplate(
+                    dormer.firstName,
+                    group.map((g) => ({
+                      finesRemarks: g.meta.reason,
+                      totalAmountDue: g.meta.amount,
+                      dateImposed: g.meta.dateImposed,
+                    })),
+                  ),
+                },
+                { silent: true },
+              );
+            }
+            if (result.ok) emailsSent++;
+            else emailsFailed++;
+          } catch {
+            emailsFailed++;
+          } finally {
+            emailsDone++;
+            setImportProgress((p) => (p ? { ...p, progress: emailsDone } : p));
           }
-          emailsDone++;
-          setImportProgress((p) => (p ? { ...p, progress: emailsDone } : p));
-          return result;
-        }),
-      );
-      for (const r of emailResults) {
-        if (r.status === "fulfilled" && (r.value as any)?.ok) emailsSent++;
-        else emailsFailed++;
-      }
+        }
+      };
+      const workerCount = Math.min(EMAIL_CONCURRENCY, dormerEntries.length);
+      await Promise.all(Array.from({ length: workerCount }, () => worker()));
       if (emailsFailed > 0) {
         toast.warning(`Fines saved. ${emailsSent} email(s) sent, ${emailsFailed} failed.`);
       } else if (emailsSent > 0) {
