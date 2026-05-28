@@ -34,10 +34,13 @@ import EditDormerModal from "./components/EditDormerModal";
 import ImportDormerModal from "./components/ImportDormerModal";
 import ImportResultModal from "./components/ImportErrorModals";
 import ImportBillsModal from "./components/ImportBillsModal";
-import { addDoc, collection, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, query, where, getDocs, writeBatch, doc } from "firebase/firestore";
 import { firestore as db } from "@/lib/firebase";
 import { toast } from "sonner";
-import { createBill, updateBill, findExistingBill, isPaidBill } from "@/lib/admin/bill";
+import { findExistingBill, isPaidBill } from "@/lib/admin/bill";
+import { sendEmail } from "@/app/utils/sendEmail";
+import { newBillTemplate } from "@/app/admin/dormers/email-templates/newBill";
+import { ProgressModal } from "@/components/ui/progress-modal";
 
 export default function DormersPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -82,12 +85,14 @@ export default function DormersPage() {
   const [showImportErrorModal, setShowImportErrorModal] = useState(false);
   const [importResults, setImportResults] = useState({ success: 0, failed: 0 });
   const [isImportingBills, setIsImportingBills] = useState(false);
-  const [billImportResults, setBillImportResults] = useState({ success: 0, failed: 0, errors: [] as string[] });
+  const [billImportResults, setBillImportResults] = useState({ success: 0, failed: 0, errors: [] as string[], emailsSent: 0, emailsFailed: 0 });
   const [showBulkConfirmDialog, setShowBulkConfirmDialog] = useState(false);
   const [bulkDuplicates, setBulkDuplicates] = useState<{ bill: any; existingId: string }[]>([]);
   const [bulkNewBills, setBulkNewBills] = useState<any[]>([]);
   const [bulkPayable, setBulkPayable] = useState<Payable | null>(null);
   const [showBillImportResultModal, setShowBillImportResultModal] = useState(false);
+  type ImportProgress = { title: string; message: string; progress: number; total: number };
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -108,63 +113,178 @@ export default function DormersPage() {
     let errorCount = 0;
 
     try {
-      // Update existing bills with new payable data
+      const payable = bulkPayable!;
+      const u = user!;
+
+      type BillOp = {
+        kind: "update" | "create";
+        ref: ReturnType<typeof doc>;
+        data: Record<string, any>;
+        rowNumber: number;
+        firstName: string;
+        lastName: string;
+        dormerId: string;
+        billingPeriod: string;
+      };
+
+      const ops: BillOp[] = [];
+
       for (const { bill, existingId } of bulkDuplicates) {
-        try {
-          const billData = {
-            id: existingId,
-            totalAmountDue: bulkPayable!.amount,
+        ops.push({
+          kind: "update",
+          ref: doc(db, "bills", existingId),
+          data: {
+            totalAmountDue: payable.amount,
             dormerId: bill.dormerId,
             dormitoryId: bill.dormitoryId,
-            description: bulkPayable!.name,
-            payableId: bulkPayable!.id,
+            description: payable.name,
+            payableId: payable.id,
             billingPeriod: bill.billingPeriod,
             amountPaid: 0,
-            status: "Unpaid" as const,
-          };
-          await updateBill(billData as any, user!);
-          successCount++;
-        } catch (error) {
-          console.error(`Error updating bill for row ${bill.rowNumber}:`, error);
-          errors.push(`Row ${bill.rowNumber}: Failed to update bill for ${bill.firstName} ${bill.lastName}.`);
-          errorCount++;
-        }
+            remainingBalance: payable.amount,
+            status: "Unpaid",
+            updatedBy: u.uid,
+            updatedAt: serverTimestamp(),
+          },
+          rowNumber: bill.rowNumber,
+          firstName: bill.firstName,
+          lastName: bill.lastName,
+          dormerId: bill.dormerId,
+          billingPeriod: bill.billingPeriod,
+        });
       }
 
-      // Create new bills
       for (const bill of bulkNewBills) {
-        try {
-          const billData = {
-            totalAmountDue: bulkPayable!.amount,
+        ops.push({
+          kind: "create",
+          ref: doc(collection(db, "bills")),
+          data: {
+            totalAmountDue: payable.amount,
             dormerId: bill.dormerId,
             dormitoryId: bill.dormitoryId,
-            description: bulkPayable!.name,
-            payableId: bulkPayable!.id,
+            description: payable.name,
+            payableId: payable.id,
             billingPeriod: bill.billingPeriod,
             amountPaid: 0,
-            remainingBalance: bulkPayable!.amount,
-            billDate: new Date(),
-            updatedAt: serverTimestamp(),
-            dormer: dormers.find(d => d.id === bill.dormerId) || null,
-            status: "Unpaid" as const,
-          };
-          await createBill(billData, user!, bill.dormitoryId);
-          successCount++;
-        } catch (error) {
-          console.error(`Error creating bill for row ${bill.rowNumber}:`, error);
-          errors.push(`Row ${bill.rowNumber}: Failed to create bill for ${bill.firstName} ${bill.lastName}.`);
-          errorCount++;
-        }
+            remainingBalance: payable.amount,
+            status: "Unpaid",
+            billDate: serverTimestamp(),
+            createdBy: u.uid,
+            createdAt: serverTimestamp(),
+          },
+          rowNumber: bill.rowNumber,
+          firstName: bill.firstName,
+          lastName: bill.lastName,
+          dormerId: bill.dormerId,
+          billingPeriod: bill.billingPeriod,
+        });
       }
-      setBillImportResults({ success: successCount, failed: errorCount, errors });
+
+      const { committed, failed } = await commitInChunks(ops);
+      successCount += committed.length;
+      errorCount += failed.length;
+      for (const f of failed) {
+        errors.push(`Row ${f.rowNumber}: Failed to save bill for ${f.firstName} ${f.lastName}.`);
+      }
+
+      const { emailsSent, emailsFailed } = await fanOutBillEmails(committed, payable);
+
+      setBillImportResults({ success: successCount, failed: errorCount, errors, emailsSent, emailsFailed });
       setShowBillImportResultModal(true);
+      if (emailsFailed > 0) {
+        toast.warning(`Bills saved. ${emailsSent} email(s) sent, ${emailsFailed} failed.`);
+      } else if (emailsSent > 0) {
+        toast.success(`Bills saved. ${emailsSent} email(s) sent.`);
+      }
     } catch (error) {
       console.error("Error in bulk bill import:", error);
       toast.error("An unexpected error occurred while importing bills.");
     } finally {
       setIsImportingBills(false);
+      setImportProgress(null);
     }
   };
+
+  // Commit Firestore ops in chunks of 500 (the writeBatch limit). Returns the
+  // ops that committed successfully and those that failed (per chunk — if a
+  // chunk fails, every op in that chunk lands in `failed`, matching Firestore's
+  // all-or-nothing batch semantics).
+  type CommitOp = {
+    kind: "update" | "create";
+    ref: ReturnType<typeof doc>;
+    data: Record<string, any>;
+    rowNumber: number;
+    firstName: string;
+    lastName: string;
+    dormerId: string;
+    billingPeriod: string;
+  };
+  async function commitInChunks(ops: CommitOp[]): Promise<{ committed: CommitOp[]; failed: CommitOp[] }> {
+    const BATCH_LIMIT = 500;
+    const committed: CommitOp[] = [];
+    const failed: CommitOp[] = [];
+    setImportProgress({ title: "Saving bills", message: "Writing to the database…", progress: 0, total: ops.length });
+    for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
+      const chunk = ops.slice(i, i + BATCH_LIMIT);
+      const batch = writeBatch(db);
+      for (const op of chunk) {
+        if (op.kind === "create") batch.set(op.ref, op.data);
+        else batch.update(op.ref, op.data);
+      }
+      try {
+        await batch.commit();
+        committed.push(...chunk);
+      } catch (err) {
+        console.error("Bulk bill batch commit failed:", err);
+        failed.push(...chunk);
+      }
+      setImportProgress((p) => (p ? { ...p, progress: Math.min(i + chunk.length, ops.length) } : p));
+    }
+    return { committed, failed };
+  }
+
+  async function fanOutBillEmails(ops: CommitOp[], payable: Payable): Promise<{ emailsSent: number; emailsFailed: number }> {
+    const EMAIL_CONCURRENCY = 5;
+    let emailsSent = 0;
+    let emailsFailed = 0;
+    setImportProgress({ title: "Sending notifications", message: "Emailing dormers…", progress: 0, total: ops.length });
+    let done = 0;
+    let nextIndex = 0;
+    const worker = async () => {
+      while (true) {
+        const i = nextIndex++;
+        if (i >= ops.length) break;
+        const op = ops[i];
+        try {
+          const dormer = dormers.find((d) => d.id === op.dormerId);
+          let result: { ok: boolean; error?: string };
+          if (!dormer?.email) {
+            result = { ok: false, error: "no dormer email" };
+          } else {
+            const periodLabel = getBillingPeriodLabel(op.billingPeriod);
+            result = await sendEmail(
+              {
+                to: dormer.email,
+                subject: `New ${payable.name} Bill for ${periodLabel}`,
+                html: newBillTemplate(dormer.firstName, payable.name, periodLabel, payable.amount),
+              },
+              { silent: true },
+            );
+          }
+          if (result.ok) emailsSent++;
+          else emailsFailed++;
+        } catch {
+          emailsFailed++;
+        } finally {
+          done++;
+          setImportProgress((p) => (p ? { ...p, progress: done } : p));
+        }
+      }
+    };
+    const workerCount = Math.min(EMAIL_CONCURRENCY, ops.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return { emailsSent, emailsFailed };
+  }
 
   const handleExportWithConfirm = async () => {
     const confirmed = await confirm({
@@ -301,10 +421,12 @@ export default function DormersPage() {
       const newBills: MappedBill[] = [];
       const duplicates: { bill: MappedBill; existingId: string }[] = [];
 
-      console.log('[BulkImport] Checking bills for duplicates. Total mapped bills:', mappedBills.length);
+      //console.log('[BulkImport] Checking bills for duplicates. Total mapped bills:', mappedBills.length);
+      setImportProgress({ title: "Checking for duplicates", message: "Looking up existing bills…", progress: 0, total: mappedBills.length });
 
       // Check each bill for duplicates using the centralized helper function
       // This logic matches GenerateBillModal for consistency
+      let checkedCount = 0;
       for (const bill of mappedBills) {
         // First check if the bill is already paid/partially paid - cannot overwrite these
         const isPaid = await isPaidBill(
@@ -314,9 +436,11 @@ export default function DormersPage() {
         );
 
         if (isPaid) {
-          console.log(`[BulkImport] Row ${bill.rowNumber}: Bill already paid for ${bill.firstName} ${bill.lastName}, skipping`);
+          //console.log(`[BulkImport] Row ${bill.rowNumber}: Bill already paid for ${bill.firstName} ${bill.lastName}, skipping`);
           errors.push(`Row ${bill.rowNumber}: Bill for ${bill.firstName} ${bill.lastName} is already paid or partially paid and cannot be overwritten.`);
           errorCount++;
+          checkedCount++;
+          setImportProgress((p) => (p ? { ...p, progress: checkedCount } : p));
           continue;
         }
 
@@ -328,17 +452,20 @@ export default function DormersPage() {
         );
 
         if (existingBillId) {
-          console.log(`[BulkImport] Row ${bill.rowNumber}: Found duplicate unpaid bill ${existingBillId} for ${bill.firstName} ${bill.lastName}`);
+          //console.log(`[BulkImport] Row ${bill.rowNumber}: Found duplicate unpaid bill ${existingBillId} for ${bill.firstName} ${bill.lastName}`);
           duplicates.push({ bill, existingId: existingBillId });
         } else {
-          console.log(`[BulkImport] Row ${bill.rowNumber}: No duplicate found, will create new bill`);
+          //console.log(`[BulkImport] Row ${bill.rowNumber}: No duplicate found, will create new bill`);
           newBills.push(bill);
         }
+        checkedCount++;
+        setImportProgress((p) => (p ? { ...p, progress: checkedCount } : p));
       }
 
-      console.log('[BulkImport] Summary:', { newBills: newBills.length, duplicates: duplicates.length, skippedPaid: errorCount });
+      //console.log('[BulkImport] Summary:', { newBills: newBills.length, duplicates: duplicates.length, skippedPaid: errorCount });
 
       if (duplicates.length > 0) {
+        setImportProgress(null);
         setShowBulkConfirmDialog(true);
         setBulkDuplicates(duplicates);
         setBulkNewBills(newBills);
@@ -346,39 +473,53 @@ export default function DormersPage() {
         return { successCount: 0, errorCount: 0, errors: [], pending: true };
       }
 
-      // No duplicates - create all bills directly
-      for (const bill of newBills) {
-        try {
-          const billData = {
-            totalAmountDue: payable.amount,
-            dormerId: bill.dormerId,
-            billingPeriod: bill.billingPeriod,
-            status: "Unpaid" as const,   
-            dormitoryId: bill.dormitoryId,
-            description: payable.name,
-            payableId: payable.id,
-            amountPaid: 0,
-            remainingBalance: payable.amount,
-            billDate: new Date(),
-            updatedAt: serverTimestamp(),
-            dormer: null,
-          };
-          await createBill(billData, user, bill.dormitoryId);
-          successCount++;
-        } catch (error) {
-          console.error(`Error creating bill for row ${bill.rowNumber}:`, error);
-          errors.push(`Row ${bill.rowNumber}: Failed to create bill for ${bill.firstName} ${bill.lastName}.`);
-          errorCount++;
-        }
+      // No duplicates - create all bills atomically in chunked batches
+      const createOps = newBills.map((bill) => ({
+        kind: "create" as const,
+        ref: doc(collection(db, "bills")),
+        data: {
+          totalAmountDue: payable.amount,
+          dormerId: bill.dormerId,
+          billingPeriod: bill.billingPeriod,
+          status: "Unpaid",
+          dormitoryId: bill.dormitoryId,
+          description: payable.name,
+          payableId: payable.id,
+          amountPaid: 0,
+          remainingBalance: payable.amount,
+          billDate: serverTimestamp(),
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+        },
+        rowNumber: bill.rowNumber,
+        firstName: bill.firstName,
+        lastName: bill.lastName,
+        dormerId: bill.dormerId,
+        billingPeriod: bill.billingPeriod,
+      }));
+
+      const { committed, failed } = await commitInChunks(createOps);
+      successCount += committed.length;
+      errorCount += failed.length;
+      for (const f of failed) {
+        errors.push(`Row ${f.rowNumber}: Failed to create bill for ${f.firstName} ${f.lastName}.`);
       }
 
-      return { successCount, errorCount, errors };
+      const { emailsSent, emailsFailed } = await fanOutBillEmails(committed, payable);
+      if (emailsFailed > 0) {
+        toast.warning(`Bills imported. ${emailsSent} email(s) sent, ${emailsFailed} failed.`);
+      } else if (emailsSent > 0) {
+        toast.success(`Bills imported. ${emailsSent} email(s) sent.`);
+      }
+
+      return { successCount, errorCount, errors, emailsSent, emailsFailed };
     } catch (error) {
       console.error("Error importing bills:", error);
       toast.error("An unexpected error occurred while importing bills.");
       return { successCount, errorCount, errors };
     } finally {
       setIsImportingBills(false);
+      setImportProgress(null);
     }
   };
 
@@ -514,10 +655,17 @@ export default function DormersPage() {
       <ImportBillsModal
         isOpen={modal === "importBills"}
         onClose={closeModal}
-        onImport={async (bills, payable) => {
+        onImport={
+          async (bills, payable) => {
           const results = await handleImportBills(bills, payable, user);
           if (!results.pending) {
-            setBillImportResults({ success: results.successCount, failed: results.errorCount, errors: results.errors });
+            setBillImportResults({
+              success: results.successCount,
+              failed: results.errorCount,
+              errors: results.errors,
+              emailsSent: results.emailsSent ?? 0,
+              emailsFailed: results.emailsFailed ?? 0,
+            });
             setShowBillImportResultModal(true);
           }
           return results;
@@ -532,6 +680,16 @@ export default function DormersPage() {
         errors={billImportResults.errors}
         successCount={billImportResults.success}
         errorCount={billImportResults.failed}
+        emailsSent={billImportResults.emailsSent}
+        emailsFailed={billImportResults.emailsFailed}
+      />
+
+      <ProgressModal
+        isOpen={importProgress !== null}
+        title={importProgress?.title}
+        message={importProgress?.message}
+        progress={importProgress?.progress}
+        total={importProgress?.total}
       />
 
       <DeleteDormerModal

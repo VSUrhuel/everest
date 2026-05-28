@@ -28,6 +28,7 @@ import { generateRandomPassword } from "@/app/admin/dormers/utils/generateRandom
 import { toast } from "sonner";
 import { welcomeUserTemplate } from "@/app/admin/dormers/email-templates/welcomeUser";
 import { initializeApp } from "firebase/app";
+import { sendEmail } from "@/app/utils/sendEmail";
 
 export const checkUserPassword = async (email: string, password: string) => {
   try {
@@ -216,29 +217,6 @@ export const softDeleteDormer = async (dormerId: string) => {
   await batch.commit();
 };
 
-const sendEmail = async (emailData: {
-  to: string;
-  subject: string;
-  html: string;
-}) => {
-  try {
-    const response = await fetch("/api/send-email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(emailData),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to send email");
-    }
-
-    await response.json();
-  } catch (error) {
-    toast.error("Failed to send notification email.");
-  }
-};
 
 const downloadLogFile = (content: string, filename: string) => {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });

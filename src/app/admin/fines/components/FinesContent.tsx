@@ -19,6 +19,7 @@ import FinesErrorModal from "./FinesErrorModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { toast } from "sonner";
 import { unpaidFinesReminderTemplate } from "../email-templates/unpaidFinesReminder";
+import { sendEmail } from "@/app/utils/sendEmail";
 
 interface FinesContentProps {
   fines: PaymentFines[];
@@ -112,36 +113,43 @@ export default function FinesContent({
         return;
       }
 
-      // Send emails
-      const emailPromises = dormersWithUnpaidFines.map(async (dormer) => {
-        const unpaidFines = dormer.fines.filter((fine: PaymentFinesData) => fine.status === "Unpaid");
-        const subject = "DormPay System - Unpaid Fines Reminder";
-        const html = unpaidFinesReminderTemplate(
-          {
-            firstName: dormer.firstName,
-            lastName: dormer.lastName
-          },
-          unpaidFines
-        );
-
-        const response = await fetch("/api/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: dormer.email,
-            subject,
-            html,
-            attachments: [],
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to send email to ${dormer.email}`);
+      // Send emails (capped concurrency to avoid overwhelming SMTP)
+      const EMAIL_CONCURRENCY = 5;
+      let sent = 0;
+      let failed = 0;
+      let nextIndex = 0;
+      const worker = async () => {
+        while (true) {
+          const i = nextIndex++;
+          if (i >= dormersWithUnpaidFines.length) break;
+          const dormer = dormersWithUnpaidFines[i];
+          const unpaidFines = dormer.fines.filter(
+            (fine: PaymentFinesData) => fine.status === "Unpaid",
+          );
+          const html = unpaidFinesReminderTemplate(
+            { firstName: dormer.firstName, lastName: dormer.lastName },
+            unpaidFines,
+          );
+          const result = await sendEmail(
+            {
+              to: dormer.email,
+              subject: "DormPay System - Unpaid Fines Reminder",
+              html,
+            },
+            { silent: true }, //suppress per-email toast notifs
+          );
+          if (result.ok) sent++;
+          else failed++;
         }
-      });
+      };
+      const workerCount = Math.min(EMAIL_CONCURRENCY, dormersWithUnpaidFines.length);
+      await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
-      await Promise.all(emailPromises);
-      toast.success(`Email reminders sent to ${dormersWithUnpaidFines.length} dormer(s) with unpaid fines.`);
+      if (failed > 0) {
+        toast.warning(`Reminders sent: ${sent} succeeded, ${failed} failed.`);
+      } else {
+        toast.success(`Email reminders sent to ${sent} dormer(s) with unpaid fines.`);
+      }
     } catch (error) {
       console.error("Error sending email reminders:", error);
       toast.error("Failed to send some email reminders. Please try again.");

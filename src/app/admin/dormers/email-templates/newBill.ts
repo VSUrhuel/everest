@@ -1,11 +1,12 @@
 export const newBillTemplate = (
   firstName: string,
+  payableName: string,
   billingPeriod: string,
   totalAmountDue: number
 ) => `
-  <h1>New Bill Generated</h1>
+  <h1>New ${payableName} Bill</h1>
   <p>Hi ${firstName},</p>
-  <p>A new bill for the period <strong>${billingPeriod}</strong> has been generated.</p>
+  <p>A new <strong>${payableName}</strong> bill for <strong>${billingPeriod}</strong> has been generated.</p>
   <p>Amount Due: <strong>₱${totalAmountDue.toFixed(2)}</strong></p>
   <p>Please pay this amount to the Dorm SA.</p>
 

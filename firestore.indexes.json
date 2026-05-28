@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "finesPayment",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dormerId", "order": "ASCENDING" },
+        { "fieldPath": "fineId", "order": "ASCENDING" },
+        { "fieldPath": "dateImposed", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

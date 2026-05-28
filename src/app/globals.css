@@ -126,3 +126,26 @@
     @apply bg-background text-foreground;
   }
 }
+
+#nprogress .bar {
+  background: linear-gradient(
+    90deg,
+    #1B5E20 0%,
+    #2E7D32 35%,
+    #66BB6A 70%,
+    #A5D6A7 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: nprogress-shimmer 2s linear infinite;
+}
+
+#nprogress .peg {
+  box-shadow:
+    0 0 14px #66BB6A,
+    0 0 8px #A5D6A7 !important;
+}
+
+@keyframes nprogress-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
