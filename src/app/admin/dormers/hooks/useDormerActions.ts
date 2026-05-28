@@ -20,6 +20,7 @@ import { billPaymentInvoiceTemplate } from "../email-templates/billPaymentInvoic
 import { generateRandomPassword } from "../utils/generateRandomPass";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 import { sendEmail } from "@/app/utils/sendEmail";
+import { getBillingPeriodLabel } from "../utils/generateBillUtils";
 import path from "path";
 import {
   collection,
@@ -199,12 +200,15 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
 
       const dormerInfo = dormers.find((d) => d.id === billData.dormerId);
       if (dormerInfo) {
+        const periodLabel = getBillingPeriodLabel(billData.billingPeriod);
+        const payableName = billData.description || "Bill";
         await sendEmail({
           to: dormerInfo.email,
-          subject: `New Bill for ${billData.billingPeriod}`,
+          subject: `New ${payableName} Bill for ${periodLabel}`,
           html: newBillTemplate(
             dormerInfo.firstName,
-            billData.billingPeriod,
+            payableName,
+            periodLabel,
             billData.totalAmountDue,
           ),
         });
@@ -245,7 +249,7 @@ export function useDormerActions(dormers: Dormer[], bills: Bill[]) {
     let errorCount = 0;
 
     // Process dormers and collect email tasks
-    const emailTasks: Promise<void>[] = [];
+    const emailTasks: Promise<unknown>[] = [];
 
     for (const dormerData of dormersList) {
       try {

@@ -51,6 +51,7 @@ import { Skeleton } from "./../../components/ui/skeleton";
 import { toast } from "sonner";
 import { formatAmount } from "./expenses/utils";
 import { convertToHTMLTable, generateEmailHtml } from "@/lib/admin/dashboardUtils";
+import { sendEmail } from "@/app/utils/sendEmail";
 import { useCurrentDormitoryId } from "@/hooks/useCurrentDormitoryId";
 import { FinesCards } from "./components/fines-cards";
 import { useFinesData } from "./fines/hooks/useFinesData";
@@ -384,18 +385,21 @@ export default function Dashboard() {
 
       // The export sheet feature (`handleExportCSV`) is removed.
       // The email is now sent with the data embedded in the body.
-      await fetch("/api/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const result = await sendEmail(
+        {
           to: recipientEmails.join(", "),
           subject: "Dormitory Summary Report",
           html: emailHtml,
-          // The 'attachments' key is completely removed
-        }),
-      });
+        },
+        { silent: true },
+      );
 
-      toast.success("Summary report has been emailed to all dormers!");
+      if (!result.ok) {
+        console.error("Failed to email report:", result.error);
+        toast.error("There was a problem sending the summary report.");
+      } else {
+        toast.success("Summary report has been emailed to all dormers!");
+      }
     } catch (error) {
       console.error("Failed to email report:", error);
       toast.error("There was a problem sending the summary report.");

@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { DormerData } from "../types";
 import { FileUp, Info, AlertCircle } from "lucide-react";
+import { readCsvFile } from "@/lib/csv/parseCsv";
 
 interface ImportDormerModalProps {
   isOpen: boolean;
@@ -81,18 +82,18 @@ export default function ImportDormerModal({
     handleClose();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
+    try {
+      const text = await readCsvFile(file);
       setCsvText(text);
       const lines = text.trim().split("\n").filter(line => line.trim());
       setRowCount(lines.length);
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      toast.error("Could not read the CSV file.");
+    }
   };
 
   const handleClose = () => {

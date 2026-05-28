@@ -1,38 +1,13 @@
 "use client";
-import { firestore as db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { User } from "firebase/auth";
 import { Dormer } from "../../dormers/types";
 import { recordPayment } from "@/lib/admin/payment";
 import { paymentConfirmationEmailTemplate } from "../utils/email";
 import { getBill } from "@/lib/admin/bill";
+import { sendEmail } from "@/app/utils/sendEmail";
 
 export function usePaymentActions(dormers: Dormer[], dormitoryId: string) {
-  const sendEmail = async (emailData: {
-    to: string;
-    subject: string;
-    html: string;
-  }) => {
-    try {
-      const response = await fetch("/api/send-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to send email");
-      }
-
-      await response.json();
-    } catch (error) {
-      console.error("Error sending email:", error);
-      toast.error("Failed to send payment confirmation email.");
-    }
-  };
-
   const handleRecordPayment = async (paymentData: any, user: User | null) => {
     if (!user || !paymentData.billId) {
       console.error(
